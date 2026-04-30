@@ -3,12 +3,15 @@ const router = express.Router();
 
 const {
   addExpense,
-  payExpense,
+  getExpense,
+  markPaid,
 } = require("../controllers/expenseController");
 
 const authMiddleware = require("../middleware/authMiddleware");
 
 router.post("/add", authMiddleware, addExpense);
-router.post("/pay", authMiddleware, payExpense);
+
+router.get("/:id", authMiddleware, getExpense);
+router.post("/mark-paid", authMiddleware, markPaid);
 
 module.exports = router;

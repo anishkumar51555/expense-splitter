@@ -10,6 +10,7 @@ import History from "./pages/History";
 import JoinGroup from "./pages/JoinGroup";
 
 import Navbar from "./components/Navbar";
+import Pay from "./pages/Pay";
 
 // Fix #8: PrivateRoute guards all authenticated pages
 function PrivateRoute({ children }) {
@@ -38,6 +39,7 @@ function AppContent() {
         <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
         <Route path="/payments" element={<PrivateRoute><Payments /></PrivateRoute>} />
         <Route path="/history" element={<PrivateRoute><History /></PrivateRoute>} />
+        <Route path="/pay/:expenseId/:userId" element={<Pay />} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
