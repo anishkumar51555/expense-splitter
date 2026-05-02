@@ -1,6 +1,5 @@
 const User = require("../models/User");
 
-// SAVE PAYMENT DETAILS
 const savePayment = async (req, res) => {
   try {
     const { upiId, qrCode } = req.body;
@@ -19,16 +18,16 @@ const savePayment = async (req, res) => {
 
     await user.save();
 
-    res.json({ msg: "Payment details saved", payment: user.payment });
+    res.json({ msg: "Payment saved", payment: user.payment });
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: "Error saving payment" });
   }
 };
 
-// GET MY PAYMENT DETAILS
 const getMyPayment = async (req, res) => {
   try {
+    // FIX: select only payment field, don't expose password or other data
     const user = await User.findById(req.user.id).select("payment");
     if (!user) return res.status(404).json({ msg: "User not found" });
 

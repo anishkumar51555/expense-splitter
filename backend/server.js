@@ -10,9 +10,9 @@ app.use(cors({
   origin: process.env.CLIENT_URL || "http://localhost:5173",
   credentials: true,
 }));
-app.use(express.json({ limit: "5mb" })); // allow base64 QR images
+app.use(express.json({ limit: "5mb" }));
 
-// Routes — all registered cleanly before server starts
+// Routes — all grouped before server starts
 const authRoutes = require("./src/routes/authRoutes");
 const groupRoutes = require("./src/routes/groupRoutes");
 const expenseRoutes = require("./src/routes/expenseRoutes");
@@ -25,21 +25,15 @@ app.use("/api/expenses", expenseRoutes);
 app.use("/api/balances", balanceRoutes);
 app.use("/api/user", userRoutes);
 
-// Health check
-app.get("/", (req, res) => {
-  res.send("API Running 🚀");
-});
+app.get("/", (req, res) => res.send("API Running 🚀"));
 
-// MongoDB connect then start server
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
     console.log("MongoDB Connected ✅");
-    app.listen(5000, () => {
-      console.log("Server running on port 5000 🚀");
-    });
+    app.listen(5000, () => console.log("Server running on port 5000 🚀"));
   })
   .catch((err) => {
-    console.error("DB Connection Error:", err);
+    console.error("DB Error:", err);
     process.exit(1);
   });

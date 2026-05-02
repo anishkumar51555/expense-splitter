@@ -5,7 +5,8 @@ import API from "../api/api";
 function JoinGroup() {
   const { code } = useParams();
   const navigate = useNavigate();
-  const [status, setStatus] = useState("joining"); // joining | success | error
+  // FIX: show proper loading/success/error states instead of just a plain text paragraph
+  const [status, setStatus] = useState("joining");
 
   useEffect(() => {
     const join = async () => {
@@ -17,14 +18,12 @@ function JoinGroup() {
           if (groupId) navigate(`/group/${groupId}`);
           else navigate("/dashboard");
         }, 1500);
-      } catch (err) {
-        console.error(err);
+      } catch {
         setStatus("error");
       }
     };
-
     join();
-  }, [code]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 flex items-center justify-center">
@@ -36,7 +35,6 @@ function JoinGroup() {
             <p className="text-gray-500 mt-2">Please wait</p>
           </>
         )}
-
         {status === "success" && (
           <>
             <div className="text-4xl mb-4">🎉</div>
@@ -44,7 +42,6 @@ function JoinGroup() {
             <p className="text-gray-500 mt-2">Redirecting to group...</p>
           </>
         )}
-
         {status === "error" && (
           <>
             <div className="text-4xl mb-4">❌</div>

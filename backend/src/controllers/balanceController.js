@@ -1,7 +1,6 @@
 const Expense = require("../models/Expense");
 const Group = require("../models/Group");
 
-// Fix #2 & #12: single module.exports at bottom, correct per-expense balance logic
 const getBalances = async (req, res) => {
   try {
     const { groupId } = req.params;
@@ -14,7 +13,7 @@ const getBalances = async (req, res) => {
       "email"
     );
 
-    // Fix #12: use per-expense participant logic, not total/n
+    // FIX: use per-expense participant logic, not total / number-of-members
     let balances = {};
     group.members.forEach((m) => {
       balances[m._id.toString()] = { email: m.email, balance: 0 };
@@ -37,7 +36,6 @@ const getBalances = async (req, res) => {
       });
     });
 
-    // Round to 2 decimals
     Object.keys(balances).forEach((id) => {
       balances[id].balance = parseFloat(balances[id].balance.toFixed(2));
     });
@@ -49,6 +47,7 @@ const getBalances = async (req, res) => {
   }
 };
 
+// FIX: settleUp was defined AFTER the first module.exports — moved here so it's always exported
 const settleUp = async (req, res) => {
   try {
     const { groupId } = req.params;
@@ -63,6 +62,7 @@ const settleUp = async (req, res) => {
       balances[m._id.toString()] = { email: m.email, balance: 0 };
     });
 
+    // FIX: per-expense split logic (same as above)
     expenses.forEach((e) => {
       if (!e.participants || e.participants.length === 0) return;
       const split = e.amount / e.participants.length;
@@ -115,5 +115,5 @@ const settleUp = async (req, res) => {
   }
 };
 
-// Fix #2: single export at the bottom
+// FIX: single export at bottom — original had module.exports before settleUp was defined
 module.exports = { getBalances, settleUp };

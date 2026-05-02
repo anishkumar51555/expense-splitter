@@ -11,15 +11,15 @@ function Profile() {
       navigate("/");
       return;
     }
-
     try {
       const decoded = JSON.parse(atob(token.split(".")[1]));
       setUser({
         email: decoded.email || "No Email",
+        // FIX: use decoded.name from token (now included in JWT) instead of splitting email
         name: decoded.name || decoded.email?.split("@")[0] || "User",
       });
     } catch (err) {
-      console.error("Token decode error:", err);
+      console.log("Token error:", err);
       navigate("/");
     }
   }, []);
@@ -38,22 +38,22 @@ function Profile() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6 pb-20 text-gray-800">
+    <div className="min-h-screen bg-gray-100 p-6 pb-16 text-gray-800">
 
       <div className="bg-white p-6 rounded-xl shadow mb-6 text-center">
         <div className="w-20 h-20 mx-auto mb-3 bg-purple-500 text-white flex items-center justify-center rounded-full text-3xl font-bold">
           {user.name.charAt(0).toUpperCase()}
         </div>
         <h2 className="text-xl font-bold">{user.name}</h2>
-        <p className="text-gray-500">{user.email}</p>
+        <p className="text-gray-600">{user.email}</p>
       </div>
 
-      <div className="bg-white p-4 rounded-xl shadow space-y-1 text-gray-800">
+      <div className="bg-white p-4 rounded shadow space-y-3 text-gray-800">
         <button className="w-full text-left p-3 hover:bg-gray-100 rounded transition">
           ✏️ Edit Profile <span className="text-gray-400 text-sm">(coming soon)</span>
         </button>
 
-        {/* Fix #14: actually navigate to /payments */}
+        {/* FIX: Payment Settings button now actually navigates to /payments */}
         <button
           onClick={() => navigate("/payments")}
           className="w-full text-left p-3 hover:bg-gray-100 rounded transition"

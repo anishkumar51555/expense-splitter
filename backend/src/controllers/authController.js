@@ -2,7 +2,6 @@ const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
-// REGISTER
 exports.register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -10,7 +9,6 @@ exports.register = async (req, res) => {
     if (!name || !email || !password) {
       return res.status(400).json({ msg: "All fields are required" });
     }
-
     if (password.length < 6) {
       return res.status(400).json({ msg: "Password must be at least 6 characters" });
     }
@@ -22,27 +20,18 @@ exports.register = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-    });
+    const user = await User.create({ name, email, password: hashedPassword });
 
-    // Fix #7: never return the password hash
+    // FIX: never return the password hash to the client
     res.status(201).json({
       msg: "User registered successfully",
-      user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-      },
+      user: { _id: user._id, name: user.name, email: user.email },
     });
   } catch (error) {
     res.status(500).json({ msg: "Server error" });
   }
 };
 
-// LOGIN
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -61,16 +50,14 @@ exports.login = async (req, res) => {
       return res.status(400).json({ msg: "Invalid email or password" });
     }
 
+    // FIX: include name in token so Profile page can show real name
     const token = jwt.sign(
       { id: user._id, email: user.email, name: user.name },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
-    res.json({
-      msg: "Login successful",
-      token,
-    });
+    res.json({ msg: "Login successful", token });
   } catch (error) {
     res.status(500).json({ msg: "Server error" });
   }

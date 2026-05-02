@@ -1,15 +1,19 @@
 const Expense = require("../models/Expense");
 const Group = require("../models/Group");
 
-// ✅ ADD EXPENSE
 const addExpense = async (req, res) => {
   try {
     const { groupId, amount, description } = req.body;
 
+    // FIX: parse amount to a number — string amounts cause silent arithmetic bugs
     const parsedAmount = parseFloat(amount);
 
     if (!parsedAmount || parsedAmount <= 0) {
       return res.status(400).json({ msg: "Invalid amount" });
+    }
+
+    if (!groupId) {
+      return res.status(400).json({ msg: "Group ID is required" });
     }
 
     const group = await Group.findById(groupId);
@@ -17,8 +21,9 @@ const addExpense = async (req, res) => {
       return res.status(404).json({ msg: "Group not found" });
     }
 
+    // FIX: verify the user is actually a member of this group
     if (!group.members.some((m) => m.toString() === req.user.id)) {
-      return res.status(403).json({ msg: "Not a member" });
+      return res.status(403).json({ msg: "You are not a member of this group" });
     }
 
     const participants = group.members.map((member) => ({
@@ -29,7 +34,7 @@ const addExpense = async (req, res) => {
     const expense = await Expense.create({
       group: groupId,
       amount: parsedAmount,
-      description: description || "Expense",
+      description: description?.trim() || "Expense",
       paidBy: req.user.id,
       participants,
     });
@@ -41,71 +46,50 @@ const addExpense = async (req, res) => {
   }
 };
 
-// ✅ GET SINGLE EXPENSE
-const getExpense = async (req, res) => {
-  try {
-    const expense = await Expense.findById(req.params.id)
-      .populate("paidBy", "email payment");
-
-    res.json(expense);
-  } catch (err) {
-    res.status(500).json({ msg: "Error fetching expense" });
-  }
-};
-
-// ✅ MARK AS PAID (USER BASED)
-const markPaid = async (req, res) => {
+const payExpense = async (req, res) => {
   try {
     const { expenseId } = req.body;
 
     if (!expenseId) {
-      return res.status(400).json({ msg: "Expense ID missing" });
+      return res.status(400).json({ msg: "Expense ID is required" });
     }
 
     const expense = await Expense.findById(expenseId);
-
     if (!expense) {
       return res.status(404).json({ msg: "Expense not found" });
     }
 
-    // 🔥 IMPORTANT DEBUG
-    console.log("Logged in user:", req.user);
+    const participant = expense.participants.find(
+      (p) => p.user.toString() === req.user.id.toString()
+    );
 
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ msg: "User not authenticated" });
+    if (!participant) {
+      return res.status(403).json({ msg: "Not part of this expense" });
     }
 
-    let found = false;
-
-    expense.participants = expense.participants.map((p) => {
-      const userId =
-        typeof p.user === "object"
-          ? p.user._id.toString()
-          : p.user.toString();
-
-      if (userId === req.user.id.toString()) {
-        found = true;
-        return { ...p._doc, paid: true };
-      }
-
-      return p;
-    });
-
-    if (!found) {
-      return res.status(403).json({ msg: "User not part of expense" });
+    if (participant.paid) {
+      return res.json({ msg: "Already paid" });
     }
 
-    await expense.save();
+    const result = await Expense.updateOne(
+  {
+    _id: expenseId,
+    "participants.user": req.user.id,
+  },
+  {
+    $set: { "participants.$.paid": true },
+  }
+);
 
-    res.json({ msg: "Payment marked successfully" });
+if (result.modifiedCount === 0) {
+  return res.status(500).json({ msg: "Could not update payment status" });
+}
+
+res.json({ msg: "Marked as paid successfully" });
   } catch (err) {
-    console.error("PAY ERROR:", err);
-    res.status(500).json({ msg: "Server error in payment" });
+    console.error(err);
+    res.status(500).json({ msg: "Error paying expense" });
   }
 };
-// ✅ EXPORT ALL (IMPORTANT 🔥)
-module.exports = {
-  addExpense,
-  getExpense,
-  markPaid,
-};
+
+module.exports = { addExpense, payExpense };

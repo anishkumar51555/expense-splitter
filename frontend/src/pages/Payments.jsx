@@ -7,7 +7,7 @@ function Payments() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Fix #3: load from backend, not localStorage
+  // FIX: load from backend, not localStorage
   useEffect(() => {
     const fetchPayment = async () => {
       try {
@@ -23,13 +23,12 @@ function Payments() {
     fetchPayment();
   }, []);
 
-  // Fix #3: save to backend API
+  // FIX: save to backend API so other group members can see your payment info
   const handleSave = async () => {
     if (!upi.trim() && !qr) {
       alert("Please enter a UPI ID or upload a QR code");
       return;
     }
-
     setSaving(true);
     try {
       await API.post("/user/payment", { upiId: upi, qrCode: qr });
@@ -44,22 +43,22 @@ function Payments() {
   const handleQrUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setQr(reader.result);
-    };
+    reader.onloadend = () => setQr(reader.result);
     reader.readAsDataURL(file);
   };
 
-  if (loading) return <div className="min-h-screen bg-gray-100 p-6 flex items-center justify-center"><p>Loading...</p></div>;
+  if (loading) return (
+    <div className="min-h-screen bg-gray-100 p-6 flex items-center justify-center">
+      <p>Loading...</p>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-100 p-6 pb-20 text-black">
       <h1 className="text-2xl font-bold mb-6">💳 Payment Settings</h1>
 
       <div className="bg-white p-6 rounded-xl shadow space-y-4">
-
         <div>
           <label className="block mb-1 font-medium">UPI ID</label>
           <input

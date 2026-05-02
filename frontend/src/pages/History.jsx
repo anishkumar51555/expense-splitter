@@ -9,19 +9,18 @@ function History() {
     try {
       const res = await API.get("/groups/history");
 
-      // Fix #5: group is now populated, so group.name works
+      // FIX: group is now populated by backend, so e.group.name works correctly
       const formatted = res.data.map((e) => ({
-        text: `${e.paidBy?.name || e.paidBy?.email || "Someone"} paid ₹${e.amount} in ${e.group?.name || "a group"}`,
         description: e.description,
         amount: e.amount,
         groupName: e.group?.name || "Unknown Group",
-        time: e.createdAt,
         paidBy: e.paidBy?.name || e.paidBy?.email || "Someone",
+        time: e.createdAt,
       }));
 
       setData(formatted);
     } catch (err) {
-      console.error(err);
+      console.log(err);
       alert("Error loading history");
     } finally {
       setLoading(false);
@@ -32,10 +31,14 @@ function History() {
     fetchHistory();
   }, []);
 
-  if (loading) return <div className="min-h-screen bg-gray-100 p-6 flex items-center justify-center"><p>Loading...</p></div>;
+  if (loading) return (
+    <div className="min-h-screen bg-gray-100 p-6 flex items-center justify-center">
+      <p>Loading...</p>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6 pb-20 text-gray-800">
+    <div className="min-h-screen bg-gray-100 p-6 pb-16 text-gray-800">
       <h1 className="text-2xl font-bold mb-6">📜 Account History</h1>
 
       {data.length === 0 ? (
@@ -49,7 +52,8 @@ function History() {
             <div key={i} className="bg-white p-4 rounded-xl shadow hover:shadow-md transition">
               <p className="font-medium">{item.description}</p>
               <p className="text-sm text-gray-500 mt-1">
-                {item.paidBy} paid in <span className="font-medium text-purple-600">{item.groupName}</span>
+                {item.paidBy} paid in{" "}
+                <span className="font-medium text-purple-600">{item.groupName}</span>
               </p>
               <div className="flex justify-between mt-2 text-sm text-gray-500">
                 <span className="font-bold text-gray-800">₹{item.amount}</span>

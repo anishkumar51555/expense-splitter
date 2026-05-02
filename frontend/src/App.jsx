@@ -10,9 +10,8 @@ import History from "./pages/History";
 import JoinGroup from "./pages/JoinGroup";
 
 import Navbar from "./components/Navbar";
-import Pay from "./pages/Pay";
 
-// Fix #8: PrivateRoute guards all authenticated pages
+// FIX: PrivateRoute guards all authenticated pages
 function PrivateRoute({ children }) {
   const token = localStorage.getItem("token");
   return token ? children : <Navigate to="/" replace />;
@@ -26,22 +25,20 @@ function AppContent() {
   return (
     <>
       <Routes>
-        {/* Public routes */}
+        {/* Public */}
         <Route path="/" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
-        {/* Fix #9: JoinGroup added as protected route */}
+        {/* FIX: JoinGroup now wired as a route */}
         <Route path="/join/:code" element={<PrivateRoute><JoinGroup /></PrivateRoute>} />
 
-        {/* Protected routes */}
+        {/* Protected */}
         <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
         <Route path="/group/:id" element={<PrivateRoute><GroupDetails /></PrivateRoute>} />
         <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
         <Route path="/payments" element={<PrivateRoute><Payments /></PrivateRoute>} />
         <Route path="/history" element={<PrivateRoute><History /></PrivateRoute>} />
-        <Route path="/pay/:expenseId/:userId" element={<Pay />} />
 
-        {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 

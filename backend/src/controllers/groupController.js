@@ -23,7 +23,7 @@ const createGroup = async (req, res) => {
 
     await group.save();
     res.json(group);
-  } catch (err) {
+  } catch {
     res.status(500).json({ msg: "Server error" });
   }
 };
@@ -44,26 +44,26 @@ const joinByInvite = async (req, res) => {
     await group.save();
 
     res.json({ msg: "Joined group successfully", group });
-  } catch (err) {
+  } catch {
     res.status(500).json({ msg: "Error joining group" });
   }
 };
 
-// GET ALL GROUPS FOR CURRENT USER
+// GET ALL GROUPS
 const getGroups = async (req, res) => {
   try {
     const groups = await Group.find({ members: req.user.id }).populate({
       path: "members",
-      select: "name email payment",
+      select: "name email payment",  // FIX: include name
     });
 
     res.json(groups);
-  } catch (err) {
+  } catch {
     res.status(500).json({ msg: "Server error" });
   }
 };
 
-// ADD MEMBER BY EMAIL — only group creator can do this
+// ADD MEMBER — FIX: only creator can add members
 const addMember = async (req, res) => {
   try {
     const { groupId, email } = req.body;
@@ -75,7 +75,7 @@ const addMember = async (req, res) => {
     const group = await Group.findById(groupId);
     if (!group) return res.status(404).json({ msg: "Group not found" });
 
-    // Fix #10: only creator can add members
+    // FIX: authorization check — only creator can add members
     if (group.createdBy.toString() !== req.user.id) {
       return res.status(403).json({ msg: "Only the group creator can add members" });
     }
@@ -91,7 +91,7 @@ const addMember = async (req, res) => {
     await group.save();
 
     res.json({ msg: "Member added", group });
-  } catch (err) {
+  } catch {
     res.status(500).json({ msg: "Server error" });
   }
 };
@@ -103,12 +103,12 @@ const getGroupDetails = async (req, res) => {
 
     const group = await Group.findById(groupId).populate({
       path: "members",
-      select: "name email payment",
+      select: "name email payment",  // FIX: include name
     });
 
     if (!group) return res.status(404).json({ msg: "Group not found" });
 
-    // Verify current user is a member
+    // FIX: verify requesting user is actually a member
     if (!group.members.some((m) => m._id.toString() === req.user.id)) {
       return res.status(403).json({ msg: "Access denied" });
     }
@@ -118,34 +118,31 @@ const getGroupDetails = async (req, res) => {
       .populate({ path: "participants.user", select: "name email payment" })
       .sort({ createdAt: -1 });
 
-    // Fix #6: correct balance calculation
-    // Step 1: init balances
+    // FIX: correct balance calculation
+    // Credit payer the full amount, then debit every participant their equal share
     let balances = {};
     group.members.forEach((m) => {
       balances[m._id.toString()] = 0;
     });
 
-    // Step 2: for each expense, credit payer full amount, debit everyone their share
     expenses.forEach((e) => {
       if (!e.participants || e.participants.length === 0) return;
       const split = e.amount / e.participants.length;
       const payerId = e.paidBy._id.toString();
 
-      // Credit the payer the full amount they paid
       if (balances[payerId] !== undefined) {
-        balances[payerId] += e.amount;
+        balances[payerId] += e.amount;  // credit payer full amount
       }
 
-      // Debit each participant their share
       e.participants.forEach((p) => {
         const uid = p.user._id.toString();
         if (balances[uid] !== undefined) {
-          balances[uid] -= split;
+          balances[uid] -= split;  // debit each participant their share
         }
       });
     });
 
-    // Step 3: split into creditors (owed money) and debtors (owe money)
+    // Split into creditors and debtors
     let creditors = [];
     let debtors = [];
 
@@ -155,7 +152,7 @@ const getGroupDetails = async (req, res) => {
       else if (bal < -0.001) debtors.push({ email: m.email, amount: bal });
     });
 
-    // Step 4: greedy settlement
+    // Greedy settlement
     let settlements = [];
     let i = 0, j = 0;
 
@@ -187,7 +184,7 @@ const getGroupDetails = async (req, res) => {
   }
 };
 
-// LEAVE GROUP — Fix #11: creator cannot leave
+// LEAVE GROUP — FIX: creator cannot leave and orphan the group
 const leaveGroup = async (req, res) => {
   try {
     const groupId = req.params.id;
@@ -195,25 +192,23 @@ const leaveGroup = async (req, res) => {
     const group = await Group.findById(groupId);
     if (!group) return res.status(404).json({ msg: "Group not found" });
 
-    // Fix #11: prevent creator from leaving
+    // FIX: prevent creator from leaving
     if (group.createdBy.toString() === req.user.id) {
       return res.status(400).json({
         msg: "Group creator cannot leave. Delete the group or transfer ownership first.",
       });
     }
 
-    group.members = group.members.filter(
-      (m) => m.toString() !== req.user.id
-    );
-
+    group.members = group.members.filter((m) => m.toString() !== req.user.id);
     await group.save();
+
     res.json({ msg: "Left group successfully" });
-  } catch (err) {
+  } catch {
     res.status(500).json({ msg: "Error leaving group" });
   }
 };
 
-// EXPENSE HISTORY — Fix #5: populate group name
+// HISTORY — FIX: populate group so group.name is available on frontend
 const getHistory = async (req, res) => {
   try {
     if (!req.user || !req.user.id) {
@@ -229,7 +224,7 @@ const getHistory = async (req, res) => {
 
     const expenses = await Expense.find({ group: { $in: groupIds } })
       .populate("paidBy", "name email")
-      .populate("group", "name")        // Fix #5: populate group so name is available
+      .populate("group", "name")  // FIX: populate group so name is available
       .sort({ createdAt: -1 });
 
     res.json(expenses);

@@ -27,7 +27,7 @@ function Dashboard() {
   }, []);
 
   const handleCreateGroup = async () => {
-    if (!groupName.trim()) return alert("Enter a group name");
+    if (!groupName.trim()) return alert("Enter group name");
 
     setCreating(true);
     try {
@@ -36,7 +36,7 @@ function Dashboard() {
       setShowModal(false);
       fetchGroups();
     } catch {
-      alert("Error creating group. Please try again.");
+      alert("Error creating group");
     } finally {
       setCreating(false);
     }
@@ -58,10 +58,7 @@ function Dashboard() {
           <h1 className="text-3xl font-bold text-gray-800">💸 Splitwise</h1>
           <p className="text-gray-500 text-sm">Manage your expenses easily</p>
         </div>
-        <button
-          onClick={handleLogout}
-          className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
-        >
+        <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600">
           Logout
         </button>
       </div>
@@ -79,11 +76,7 @@ function Dashboard() {
         <p className="text-gray-500 text-center">Loading...</p>
       ) : groups.length === 0 ? (
         <div className="text-center mt-20">
-          <img
-            src="https://cdn-icons-png.flaticon.com/512/4076/4076549.png"
-            alt="empty"
-            className="w-32 mx-auto mb-4 opacity-70"
-          />
+          <img src="https://cdn-icons-png.flaticon.com/512/4076/4076549.png" alt="empty" className="w-32 mx-auto mb-4 opacity-70" />
           <p className="text-gray-500 text-lg">No groups yet</p>
           <p className="text-gray-400 text-sm">Create your first group 🚀</p>
         </div>
@@ -96,11 +89,10 @@ function Dashboard() {
               className="bg-white/80 backdrop-blur p-6 rounded-2xl shadow hover:shadow-xl hover:scale-105 transition cursor-pointer border"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-purple-200 rounded-full flex items-center justify-center text-xl">
-                  📁
-                </div>
+                <div className="w-10 h-10 bg-purple-200 rounded-full flex items-center justify-center text-xl">📁</div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-800">{g.name}</h3>
+                  {/* FIX: show member count on card */}
                   <p className="text-sm text-gray-500">{g.members?.length} members</p>
                 </div>
               </div>
@@ -111,7 +103,7 @@ function Dashboard() {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-20">
-          <div className="bg-white p-6 rounded-xl w-80 shadow-lg">
+          <div className="bg-white p-6 rounded-xl w-80 shadow-lg animate-fade">
             <h2 className="text-xl font-semibold mb-4 text-gray-800">Create Group</h2>
             <input
               placeholder="Group name"
@@ -121,17 +113,10 @@ function Dashboard() {
               className="w-full p-3 border rounded-lg mb-4 text-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-400"
             />
             <div className="flex justify-end gap-2">
-              <button
-                onClick={() => { setShowModal(false); setGroupName(""); }}
-                className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300"
-              >
+              <button onClick={() => { setShowModal(false); setGroupName(""); }} className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">
                 Cancel
               </button>
-              <button
-                onClick={handleCreateGroup}
-                disabled={creating}
-                className="px-4 py-2 rounded bg-purple-500 text-white hover:bg-purple-600 disabled:opacity-50"
-              >
+              <button onClick={handleCreateGroup} disabled={creating} className="px-4 py-2 rounded bg-purple-500 text-white hover:bg-purple-600 disabled:opacity-50">
                 {creating ? "Creating..." : "Create"}
               </button>
             </div>
