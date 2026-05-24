@@ -26,7 +26,7 @@ function JoinGroup() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 flex items-center justify-center">
+    <div className="min-h-screen bg-transparent ...">
       <div className="bg-white p-8 rounded-2xl shadow-xl text-center w-80">
         {status === "joining" && (
           <>

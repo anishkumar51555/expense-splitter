@@ -222,12 +222,46 @@ const getHistory = async (req, res) => {
       return res.json([]);
     }
 
+    // Fetch expenses
     const expenses = await Expense.find({ group: { $in: groupIds } })
       .populate("paidBy", "name email")
-      .populate("group", "name")  // FIX: populate group so name is available
+      .populate("group", "name")
       .sort({ createdAt: -1 });
 
-    res.json(expenses);
+    // Fetch payments (settlements)
+    const Payment = require("../models/Payment");
+    const payments = await Payment.find({ group: { $in: groupIds } })
+      .populate("paidBy", "name email")
+      .populate("paidTo", "name email")
+      .populate("group", "name")
+      .sort({ createdAt: -1 });
+
+    // Combine into a unified list with a type tag
+    const expenseItems = expenses.map((e) => ({
+      type: "expense",
+      description: e.description,
+      amount: e.amount,
+      groupName: e.group?.name || "Unknown Group",
+      paidBy: e.paidBy?.name || e.paidBy?.email || "Someone",
+      time: e.createdAt,
+    }));
+
+    const paymentItems = payments.map((p) => ({
+      type: "payment",
+      description: `Settled payment`,
+      amount: p.amount,
+      groupName: p.group?.name || "Unknown Group",
+      paidBy: p.paidBy?.name || p.paidBy?.email || "Someone",
+      paidTo: p.paidTo?.name || p.paidTo?.email || "Someone",
+      time: p.createdAt,
+    }));
+
+    // Merge and sort by time descending
+    const combined = [...expenseItems, ...paymentItems].sort(
+      (a, b) => new Date(b.time) - new Date(a.time)
+    );
+
+    res.json(combined);
   } catch (err) {
     console.error("HISTORY ERROR:", err);
     res.status(500).json({ msg: "Server error" });

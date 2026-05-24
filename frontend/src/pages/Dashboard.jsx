@@ -22,13 +22,10 @@ function Dashboard() {
     }
   };
 
-  useEffect(() => {
-    fetchGroups();
-  }, []);
+  useEffect(() => { fetchGroups(); }, []);
 
   const handleCreateGroup = async () => {
     if (!groupName.trim()) return alert("Enter group name");
-
     setCreating(true);
     try {
       await API.post("/groups/create", { name: groupName.trim() });
@@ -48,52 +45,59 @@ function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 p-6 pb-20 relative">
+    <div className="min-h-screen pb-24 px-4 pt-6">
 
-      <div className="absolute top-0 left-0 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
-      <div className="absolute top-0 right-0 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
-
-      <div className="flex justify-between items-center mb-8 relative z-10">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">💸 Splitwise</h1>
-          <p className="text-gray-500 text-sm">Manage your expenses easily</p>
+      {/* Header */}
+      <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-5 mb-6 shadow-xl">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-white">💸 Splitwise</h1>
+            <p className="text-white/50 text-sm">Manage your expenses easily</p>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="bg-red-500/20 border border-red-400/30 text-red-400 px-4 py-2 rounded-2xl text-sm font-semibold hover:bg-red-500/30 transition"
+          >
+            🚪 Logout
+          </button>
         </div>
-        <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600">
-          Logout
-        </button>
       </div>
 
-      <div className="mb-6 relative z-10">
-        <button
-          onClick={() => setShowModal(true)}
-          className="bg-purple-500 text-white px-6 py-3 rounded-xl shadow hover:bg-purple-600 transition"
-        >
-          + New Group
-        </button>
-      </div>
+      {/* New Group Button */}
+      <button
+        onClick={() => setShowModal(true)}
+        className="w-full bg-purple-500 text-white py-4 rounded-3xl font-bold text-lg hover:bg-purple-600 transition shadow-lg shadow-purple-500/30 mb-6 flex items-center justify-center gap-2"
+      >
+        <span className="text-xl">+</span> New Group
+      </button>
 
+      {/* Groups */}
       {loading ? (
-        <p className="text-gray-500 text-center">Loading...</p>
+        <div className="text-center mt-20">
+          <div className="text-5xl mb-4 animate-bounce">👥</div>
+          <p className="text-white/60">Loading groups...</p>
+        </div>
       ) : groups.length === 0 ? (
         <div className="text-center mt-20">
-          <img src="https://cdn-icons-png.flaticon.com/512/4076/4076549.png" alt="empty" className="w-32 mx-auto mb-4 opacity-70" />
-          <p className="text-gray-500 text-lg">No groups yet</p>
-          <p className="text-gray-400 text-sm">Create your first group 🚀</p>
+          <div className="text-6xl mb-4">🗂️</div>
+          <p className="text-white text-lg font-semibold">No groups yet</p>
+          <p className="text-white/40 text-sm mt-1">Create your first group above 🚀</p>
         </div>
       ) : (
-        <div className="grid md:grid-cols-3 gap-6 relative z-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {groups.map((g) => (
             <div
               key={g._id}
               onClick={() => navigate(`/group/${g._id}`)}
-              className="bg-white/80 backdrop-blur p-6 rounded-2xl shadow hover:shadow-xl hover:scale-105 transition cursor-pointer border"
+              className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-5 hover:bg-white/20 hover:scale-105 transition cursor-pointer shadow-xl"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-purple-200 rounded-full flex items-center justify-center text-xl">📁</div>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-purple-500/30 border border-purple-400/30 rounded-2xl flex items-center justify-center text-2xl">
+                  💰
+                </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-800">{g.name}</h3>
-                  {/* FIX: show member count on card */}
-                  <p className="text-sm text-gray-500">{g.members?.length} members</p>
+                  <h3 className="text-lg font-bold text-white">{g.name}</h3>
+                  <p className="text-white/40 text-sm">👥 {g.members?.length} members</p>
                 </div>
               </div>
             </div>
@@ -101,22 +105,31 @@ function Dashboard() {
         </div>
       )}
 
+      {/* Create Group Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-20">
-          <div className="bg-white p-6 rounded-xl w-80 shadow-lg animate-fade">
-            <h2 className="text-xl font-semibold mb-4 text-gray-800">Create Group</h2>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-20 p-4">
+          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-6 w-full max-w-sm shadow-2xl">
+            <h2 className="text-xl font-bold text-white mb-1">Create Group</h2>
+            <p className="text-white/40 text-sm mb-5">Give your group a name</p>
             <input
-              placeholder="Group name"
+              placeholder="e.g. Goa Trip, Flat Expenses..."
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleCreateGroup()}
-              className="w-full p-3 border rounded-lg mb-4 text-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-400"
+              className="w-full bg-white text-gray-800 px-4 py-3 rounded-2xl mb-4 focus:outline-none focus:ring-2 focus:ring-purple-400 placeholder-gray-400"
             />
-            <div className="flex justify-end gap-2">
-              <button onClick={() => { setShowModal(false); setGroupName(""); }} className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowModal(false); setGroupName(""); }}
+                className="flex-1 py-3 rounded-2xl border border-white/20 text-white/70 hover:bg-white/10 transition font-medium"
+              >
                 Cancel
               </button>
-              <button onClick={handleCreateGroup} disabled={creating} className="px-4 py-2 rounded bg-purple-500 text-white hover:bg-purple-600 disabled:opacity-50">
+              <button
+                onClick={handleCreateGroup}
+                disabled={creating}
+                className="flex-1 py-3 rounded-2xl bg-purple-500 text-white font-bold hover:bg-purple-600 transition disabled:opacity-50 shadow-lg shadow-purple-500/30"
+              >
                 {creating ? "Creating..." : "Create"}
               </button>
             </div>

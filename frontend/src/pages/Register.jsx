@@ -24,7 +24,7 @@ function Register() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100">
+    <div className="min-h-screen bg-transparent ...">
 
       <div className="bg-white/80 backdrop-blur p-8 rounded-2xl shadow-2xl w-96 animate-fade">
 

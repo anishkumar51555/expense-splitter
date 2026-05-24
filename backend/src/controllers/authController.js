@@ -52,13 +52,40 @@ exports.login = async (req, res) => {
 
     // FIX: include name in token so Profile page can show real name
     const token = jwt.sign(
-      { id: user._id, email: user.email, name: user.name },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+  { id: user._id, email: user.email, name: user.name, paymentSetup: user.paymentSetup },
+  process.env.JWT_SECRET,
+  { expiresIn: "7d" }
+);
 
     res.json({ msg: "Login successful", token });
   } catch (error) {
+    res.status(500).json({ msg: "Server error" });
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    if (!email || !newPassword) {
+      return res.status(400).json({ msg: "Email and new password are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ msg: "Password must be at least 6 characters" });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ msg: "No account found with this email" });
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+
+    await User.updateOne({ email }, { $set: { password: hashed } });
+
+    res.json({ msg: "Password reset successfully" });
+  } catch (err) {
     res.status(500).json({ msg: "Server error" });
   }
 };
