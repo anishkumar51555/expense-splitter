@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "https://expense-splitter-backend-2q5v.onrender.com",
+  baseURL: "https://expense-splitter-backend-2q5v.onrender.com/api",
 });
 
 // 🔥 TOKEN AUTO ATTACH
