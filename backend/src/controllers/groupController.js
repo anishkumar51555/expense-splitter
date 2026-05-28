@@ -126,21 +126,28 @@ const getGroupDetails = async (req, res) => {
     });
 
     expenses.forEach((e) => {
-      if (!e.participants || e.participants.length === 0) return;
-      const split = e.amount / e.participants.length;
-      const payerId = e.paidBy._id.toString();
+  if (!e.participants || e.participants.length === 0) return;
+  const split = e.amount / e.participants.length;
+  const payerId = e.paidBy._id.toString();
 
-      if (balances[payerId] !== undefined) {
-        balances[payerId] += e.amount;  // credit payer full amount
-      }
+  e.participants.forEach((p) => {
+    const uid = p.user._id.toString();
 
-      e.participants.forEach((p) => {
-        const uid = p.user._id.toString();
-        if (balances[uid] !== undefined) {
-          balances[uid] -= split;  // debit each participant their share
-        }
-      });
-    });
+    // Skip participants who have already paid — don't include them in balances
+    if (p.paid) return;
+
+    // This participant still owes their share
+    // Debit them
+    if (balances[uid] !== undefined) {
+      balances[uid] -= split;
+    }
+
+    // Credit the payer only for unpaid shares
+    if (balances[payerId] !== undefined) {
+      balances[payerId] += split;
+    }
+  });
+});
 
     // Split into creditors and debtors
     let creditors = [];
@@ -224,9 +231,10 @@ const getHistory = async (req, res) => {
 
     // Fetch expenses
     const expenses = await Expense.find({ group: { $in: groupIds } })
-      .populate("paidBy", "name email")
-      .populate("group", "name")
-      .sort({ createdAt: -1 });
+  .populate("paidBy", "name email")
+  .populate("participants.user", "name email")
+  .populate("group", "name")
+  .sort({ createdAt: -1 });
 
     // Fetch payments (settlements)
     const Payment = require("../models/Payment");
@@ -237,24 +245,51 @@ const getHistory = async (req, res) => {
       .sort({ createdAt: -1 });
 
     // Combine into a unified list with a type tag
-    const expenseItems = expenses.map((e) => ({
+    // Only show expenses where the current user is the payer OR a participant
+const expenseItems = expenses
+  .filter((e) => {
+    const isParticipant = e.participants?.some(
+      (p) => p.user?._id?.toString() === req.user.id.toString()
+    );
+    return isParticipant;
+  })
+  .map((e) => {
+    const isPayer = e.paidBy?._id?.toString() === req.user.id?.toString() || e.paidBy?.toString() === req.user.id?.toString();
+    const split = e.participants?.length ? e.amount / e.participants.length : 0;
+    const myEntry = e.participants?.find(
+      (p) => p.user?._id?.toString() === req.user.id.toString()
+    );
+    return {
       type: "expense",
       description: e.description,
-      amount: e.amount,
+      amount: isPayer ? parseFloat(((e.participants.length - 1) * split).toFixed(2)) : split,
       groupName: e.group?.name || "Unknown Group",
-      paidBy: e.paidBy?.name || e.paidBy?.email || "Someone",
+      paidBy: isPayer ? "You" : (e.paidBy?.name || e.paidBy?.email || "Someone"),
+      isPayer,
+      settled: myEntry?.paid || false,
       time: e.createdAt,
-    }));
+    };
+  });
 
-    const paymentItems = payments.map((p) => ({
+// Only show payments where current user is sender or receiver
+const paymentItems = payments
+  .filter((p) =>
+    p.paidBy?._id?.toString() === req.user.id.toString() ||
+    p.paidTo?._id?.toString() === req.user.id.toString()
+  )
+  .map((p) => {
+    const isSender = p.paidBy?._id?.toString() === req.user.id.toString();
+    return {
       type: "payment",
-      description: `Settled payment`,
+      description: "Settled payment",
       amount: p.amount,
       groupName: p.group?.name || "Unknown Group",
-      paidBy: p.paidBy?.name || p.paidBy?.email || "Someone",
-      paidTo: p.paidTo?.name || p.paidTo?.email || "Someone",
+      isSender,
+      paidBy: isSender ? "You" : (p.paidBy?.name || p.paidBy?.email),
+      paidTo: isSender ? (p.paidTo?.name || p.paidTo?.email) : "You",
       time: p.createdAt,
-    }));
+    };
+  });
 
     // Merge and sort by time descending
     const combined = [...expenseItems, ...paymentItems].sort(

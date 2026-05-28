@@ -95,16 +95,30 @@ function GroupDetails() {
 
   // Balance summary
   let youOwe = 0;
-  let youAreOwed = 0;
+let youAreOwed = 0;
 
-  expenses.forEach((e) => {
-    const split = e.participants?.length ? e.amount / e.participants.length : 0;
-    const isPayer = e.paidBy?._id?.toString() === currentUserId?.toString();
-    const my = e.participants?.find((p) => p.user?._id?.toString() === currentUserId?.toString());
-    if (!my) return;
-    if (isPayer) youAreOwed += e.amount - split;
-    else if (!my.paid) youOwe += split;
-  });
+expenses.forEach((e) => {
+  const split = e.participants?.length ? e.amount / e.participants.length : 0;
+  const isPayer = e.paidBy?._id?.toString() === currentUserId?.toString();
+
+  if (isPayer) {
+    // For each participant who hasn't paid yet (excluding yourself), you are owed their share
+    e.participants.forEach((p) => {
+      const isMe = p.user?._id?.toString() === currentUserId?.toString();
+      if (!isMe && !p.paid) {
+        youAreOwed += split;
+      }
+    });
+  } else {
+    // Find my entry — if I haven't paid, I owe my share
+    const my = e.participants?.find(
+      (p) => p.user?._id?.toString() === currentUserId?.toString()
+    );
+    if (my && !my.paid) {
+      youOwe += split;
+    }
+  }
+});
 
   const categories = [
     { label: "🍔 Food", value: "Food" },
@@ -415,28 +429,39 @@ function GroupDetails() {
             </div>
           ) : (
             <div className="space-y-3">
-              {settlements.map((s, i) => (
-                <div key={i} className="bg-white rounded-2xl p-4 flex items-center justify-between shadow">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-red-100 rounded-full flex items-center justify-center text-sm font-bold text-red-600">
-                      {s.from[0].toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Owes</p>
-                      <p className="font-bold text-gray-800 text-sm">{s.from}</p>
-                    </div>
-                    <div className="text-gray-300 text-xl px-1">→</div>
-                    <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center text-sm font-bold text-green-600">
-                      {s.to[0].toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Receives</p>
-                      <p className="font-bold text-gray-800 text-sm">{s.to}</p>
-                    </div>
-                  </div>
-                  <span className="font-bold text-red-500 text-base">₹{s.amount}</span>
-                </div>
-              ))}
+              {settlements
+  .filter((s) => {
+    // Only show settlements involving current user's email
+    const myEmail = group.members.find(
+      (m) => m._id.toString() === currentUserId
+    )?.email;
+    return s.from === myEmail || s.to === myEmail;
+  })
+  .map((s, i) => {
+    const myEmail = group.members.find(
+      (m) => m._id.toString() === currentUserId
+    )?.email;
+    const iOwe = s.from === myEmail;
+
+    return (
+      <div key={i} className="bg-white/10 border border-white/20 rounded-2xl p-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
+            iOwe ? "bg-red-500/20 text-red-300" : "bg-green-500/20 text-green-300"
+          }`}>
+            {iOwe ? s.to[0].toUpperCase() : s.from[0].toUpperCase()}
+          </div>
+          <div>
+            <p className="text-xs text-white/40">{iOwe ? "You owe" : "Owes you"}</p>
+            <p className="font-bold text-white text-sm">{iOwe ? s.to : s.from}</p>
+          </div>
+        </div>
+        <span className={`font-bold text-base ${iOwe ? "text-red-400" : "text-green-400"}`}>
+          {iOwe ? `-₹${s.amount}` : `+₹${s.amount}`}
+        </span>
+      </div>
+    );
+  })}
             </div>
           )}
         </div>

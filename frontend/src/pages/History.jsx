@@ -74,34 +74,37 @@ function History() {
                   </div>
 
                   <p className="text-sm text-white/50">
-                    {item.type === "expense" ? (
-                      <>
-                        <span className="text-white/70 font-medium">{item.paidBy}</span>
-                        {" "}paid in{" "}
-                        <span className="text-purple-300 font-semibold">{item.groupName}</span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-white/70 font-medium">{item.paidBy}</span>
-                        {" "}paid{" "}
-                        <span className="text-green-300 font-semibold">{item.paidTo}</span>
-                        {" "}in{" "}
-                        <span className="text-purple-300 font-semibold">{item.groupName}</span>
-                      </>
-                    )}
-                  </p>
+  {item.type === "expense" ? (
+    item.isPayer ? (
+      <>You paid in <span className="text-purple-300 font-semibold">{item.groupName}</span></>
+    ) : (
+      <><span className="text-white/70 font-medium">{item.paidBy}</span> paid in <span className="text-purple-300 font-semibold">{item.groupName}</span></>
+    )
+  ) : (
+    item.isSender ? (
+      <>You paid <span className="text-green-300 font-semibold">{item.paidTo}</span> in <span className="text-purple-300 font-semibold">{item.groupName}</span></>
+    ) : (
+      <><span className="text-green-300 font-semibold">{item.paidBy}</span> paid you in <span className="text-purple-300 font-semibold">{item.groupName}</span></>
+    )
+  )}
+</p>
 
-                  <div className="flex justify-between items-center mt-2">
-                    <span className={`font-bold text-base ${
-                      item.type === "payment" ? "text-green-400" : "text-white"
-                    }`}>
-                      ₹{item.amount}
-                    </span>
-                    <span className="text-white/30 text-xs">
-                      {new Date(item.time).toLocaleString()}
-                    </span>
-                  </div>
-                </div>
+<div className="flex justify-between items-center mt-2">
+  <span className={`font-bold text-base ${
+    item.type === "payment"
+      ? item.isSender ? "text-red-400" : "text-green-400"
+      : item.isPayer ? "text-green-400" : "text-red-400"
+  }`}>
+    {item.type === "payment"
+      ? item.isSender ? `-₹${item.amount}` : `+₹${item.amount}`
+      : item.isPayer ? `+₹${item.amount}` : `-₹${item.amount}`
+    }
+  </span>
+  <span className="text-white/30 text-xs">
+    {new Date(item.time).toLocaleString()}
+  </span>
+</div>
+</div>
               </div>
             </div>
           ))}
