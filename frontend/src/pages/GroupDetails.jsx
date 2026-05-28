@@ -20,7 +20,7 @@ function GroupDetails() {
   const [payModal, setPayModal] = useState(null);
   const [markingPaid, setMarkingPaid] = useState(false);
   const [copiedUpi, setCopiedUpi] = useState(false);
-
+  const [memberEmail, setMemberEmail] = useState("");
   const fetchData = async () => {
     try {
       const res = await API.get(`/groups/${id}`);
@@ -56,6 +56,29 @@ function GroupDetails() {
       setAddingExpense(false);
     }
   };
+
+  const addMember = async () => {
+  if (!memberEmail) {
+    return alert("Enter email");
+  }
+
+  try {
+    const res = await API.post("/groups/add-member", {
+      groupId: id,
+      email: memberEmail,
+    });
+
+    alert(res.data.msg);
+
+    setMemberEmail("");
+
+    fetchData();
+  } catch (err) {
+    alert(
+      err.response?.data?.msg || "Error adding member"
+    );
+  }
+};
 
   const copyInviteLink = () => {
     const link = `${window.location.origin}/join/${group.inviteCode}`;
@@ -468,8 +491,29 @@ expenses.forEach((e) => {
       )}
 
       {/* ── MEMBERS TAB ── */}
-      {activeTab === "members" && (
-        <div className="space-y-3">
+{activeTab === "members" && (
+  <div className="space-y-3">
+
+    {/* Add Member Card */}
+    <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-5 shadow-xl">
+      <h2 className="text-white font-bold text-lg mb-4">➕ Add Member</h2>
+      <div className="flex gap-2">
+        <input
+          type="email"
+          placeholder="Enter registered email"
+          value={memberEmail}
+          onChange={(e) => setMemberEmail(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && addMember()}
+          className="flex-1 bg-white text-gray-800 placeholder-gray-400 px-4 py-3 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-400"
+        />
+        <button
+          onClick={addMember}
+          className="bg-purple-500 text-white px-5 py-3 rounded-2xl font-bold hover:bg-purple-600 transition shadow-lg shadow-purple-500/30"
+        >
+          Add
+        </button>
+      </div>
+    </div>
           {group.members.map((m) => (
             <div key={m._id} className="bg-white rounded-3xl p-4 shadow-lg">
               <div className="flex items-center gap-3 mb-3">
