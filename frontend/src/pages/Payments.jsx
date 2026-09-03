@@ -13,9 +13,11 @@ function Payments() {
     const fetchPayment = async () => {
       try {
         const res = await API.get("/user/payment");
-        if (res.data?.upiId) setUpi(res.data.upiId);
-        if (res.data?.qrCode) setQr(res.data.qrCode);
-        if (res.data?.phone) setPhone(res.data.phone);
+        // The API nests these under `payment`.
+        const p = res.data?.payment || {};
+        if (p.upiId) setUpi(p.upiId);
+        if (p.qrCode) setQr(p.qrCode);
+        if (p.phone) setPhone(p.phone);
       } catch (err) {
         console.error("Error loading payment details:", err);
       } finally {
@@ -32,7 +34,8 @@ function Payments() {
     }
     setSaving(true);
     try {
-      await API.post("/user/payment", { upiId: upi, qrCode: qr, phone });
+      const res = await API.post("/user/payment", { upiId: upi, qrCode: qr, phone });
+      if (res.data?.token) localStorage.setItem("token", res.data.token);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch {

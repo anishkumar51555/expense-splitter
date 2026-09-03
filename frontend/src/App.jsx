@@ -10,6 +10,8 @@ import History from "./pages/History";
 import JoinGroup from "./pages/JoinGroup";
 import Navbar from "./components/Navbar";
 import PaymentSetup from "./pages/PaymentSetup";
+import VerifyEmail from "./pages/VerifyEmail";
+import ResetPassword from "./pages/ResetPassword";
 
 // FIX: PrivateRoute guards all authenticated pages
 function PrivateRoute({ children }) {
@@ -17,7 +19,7 @@ function PrivateRoute({ children }) {
   return token ? children : <Navigate to="/" replace />;
 }
 
-const hideNavbarRoutes = ["/", "/register"];
+const hideNavbarRoutes = ["/", "/register", "/verify-email", "/reset-password"];
 
 function AppContent() {
   const location = useLocation();
@@ -30,6 +32,8 @@ function AppContent() {
           {/* Public */}
           <Route path="/" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/join/:code" element={<PrivateRoute><JoinGroup /></PrivateRoute>} />
 
           {/* Protected */}

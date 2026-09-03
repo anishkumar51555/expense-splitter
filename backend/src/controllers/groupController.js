@@ -2,6 +2,7 @@ const Group = require("../models/Group");
 const User = require("../models/User");
 const Expense = require("../models/Expense");
 const crypto = require("crypto");
+const { computeBalances, computeSettlements } = require("../utils/balances");
 
 // CREATE GROUP
 const createGroup = async (req, res) => {
@@ -118,71 +119,22 @@ const getGroupDetails = async (req, res) => {
       .populate({ path: "participants.user", select: "name email payment" })
       .sort({ createdAt: -1 });
 
-    // FIX: correct balance calculation
-    // Credit payer the full amount, then debit every participant their equal share
-    let balances = {};
+    // Balances come from each participant's stored share, so unequal splits
+    // settle for exactly what was agreed.
+    const balances = computeBalances(group.members, expenses);
+
+    const labelById = {};
     group.members.forEach((m) => {
-      balances[m._id.toString()] = 0;
+      labelById[m._id.toString()] = m.email;
     });
 
-    expenses.forEach((e) => {
-  if (!e.participants || e.participants.length === 0) return;
-  const split = e.amount / e.participants.length;
-  const payerId = e.paidBy._id.toString();
-
-  e.participants.forEach((p) => {
-    const uid = p.user._id.toString();
-
-    // Skip participants who have already paid — don't include them in balances
-    if (p.paid) return;
-
-    // This participant still owes their share
-    // Debit them
-    if (balances[uid] !== undefined) {
-      balances[uid] -= split;
-    }
-
-    // Credit the payer only for unpaid shares
-    if (balances[payerId] !== undefined) {
-      balances[payerId] += split;
-    }
-  });
-});
-
-    // Split into creditors and debtors
-    let creditors = [];
-    let debtors = [];
-
-    group.members.forEach((m) => {
-      const bal = parseFloat(balances[m._id.toString()].toFixed(2));
-      if (bal > 0.001) creditors.push({ email: m.email, amount: bal });
-      else if (bal < -0.001) debtors.push({ email: m.email, amount: bal });
-    });
-
-    // Greedy settlement
-    let settlements = [];
-    let i = 0, j = 0;
-
-    while (i < debtors.length && j < creditors.length) {
-      const min = Math.min(Math.abs(debtors[i].amount), creditors[j].amount);
-
-      settlements.push({
-        from: debtors[i].email,
-        to: creditors[j].email,
-        amount: parseFloat(min.toFixed(2)),
-      });
-
-      debtors[i].amount += min;
-      creditors[j].amount -= min;
-
-      if (Math.abs(debtors[i].amount) < 0.001) i++;
-      if (Math.abs(creditors[j].amount) < 0.001) j++;
-    }
+    const settlements = computeSettlements(balances, labelById);
 
     res.json({
       group,
       expenses,
       settlements,
+      balances,
       currentUserId: req.user.id,
     });
   } catch (err) {
@@ -255,14 +207,22 @@ const expenseItems = expenses
   })
   .map((e) => {
     const isPayer = e.paidBy?._id?.toString() === req.user.id?.toString() || e.paidBy?.toString() === req.user.id?.toString();
-    const split = e.participants?.length ? e.amount / e.participants.length : 0;
     const myEntry = e.participants?.find(
       (p) => p.user?._id?.toString() === req.user.id.toString()
     );
+
+    // What this row is worth to me: as the payer, everyone else's shares put
+    // together; otherwise just my own share.
+    const othersTotal = (e.participants || [])
+      .filter((p) => p.user?._id?.toString() !== req.user.id.toString())
+      .reduce((sum, p) => sum + (p.share || 0), 0);
+
     return {
       type: "expense",
       description: e.description,
-      amount: isPayer ? parseFloat(((e.participants.length - 1) * split).toFixed(2)) : split,
+      amount: parseFloat((isPayer ? othersTotal : myEntry?.share || 0).toFixed(2)),
+      total: e.amount,
+      splitType: e.splitType || "equal",
       groupName: e.group?.name || "Unknown Group",
       paidBy: isPayer ? "You" : (e.paidBy?.name || e.paidBy?.email || "Someone"),
       isPayer,

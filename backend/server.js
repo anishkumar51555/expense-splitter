@@ -1,40 +1,24 @@
-const express = require("express");
-const mongoose = require("mongoose");
-const cors = require("cors");
 require("dotenv").config();
 
-const app = express();
+const mongoose = require("mongoose");
+const app = require("./src/app");
+const { smtpConfigured } = require("./src/utils/email");
+const { gatewayConfigured } = require("./src/controllers/paymentController");
 
-// Middleware
-app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "https://expense-splitter-ebon-xi.vercel.app"
-  ],
-  credentials: true,
-}));
-app.use(express.json({ limit: "5mb" }));
+const PORT = process.env.PORT || 5000;
 
-// Routes — all grouped before server starts
-const authRoutes = require("./src/routes/authRoutes");
-const groupRoutes = require("./src/routes/groupRoutes");
-const expenseRoutes = require("./src/routes/expenseRoutes");
-const balanceRoutes = require("./src/routes/balanceRoutes");
-const userRoutes = require("./src/routes/userRoutes");
-
-app.use("/api/auth", authRoutes);
-app.use("/api/groups", groupRoutes);
-app.use("/api/expenses", expenseRoutes);
-app.use("/api/balances", balanceRoutes);
-app.use("/api/user", userRoutes);
-
-app.get("/", (req, res) => res.send("API Running 🚀"));
+if (!process.env.JWT_SECRET) {
+  console.error("JWT_SECRET is not set — refusing to start.");
+  process.exit(1);
+}
 
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
     console.log("MongoDB Connected ✅");
-    app.listen(5000, () => console.log("Server running on port 5000 🚀"));
+    console.log(`Email: ${smtpConfigured() ? "SMTP configured ✅" : "not configured ⚠️  (links will be logged to this console)"}`);
+    console.log(`Payments: ${gatewayConfigured() ? "Razorpay configured ✅" : "not configured ⚠️  (manual settle only)"}`);
+    app.listen(PORT, () => console.log(`Server running on port ${PORT} 🚀`));
   })
   .catch((err) => {
     console.error("DB Error:", err);

@@ -31,11 +31,11 @@ function PaymentSetup() {
 
     setSaving(true);
     try {
-      await API.post("/user/payment", { upiId: upi, phone, qrCode: qr });
+      const res = await API.post("/user/payment", { upiId: upi, phone, qrCode: qr });
 
-      // Update token so paymentSetup = true on next decode
-      // Fetch fresh token by re-logging — instead, just flag in localStorage
-      localStorage.setItem("paymentSetup", "true");
+      // The API returns a refreshed token with paymentSetup = true, so the next
+      // login goes straight to the dashboard.
+      if (res.data?.token) localStorage.setItem("token", res.data.token);
 
       navigate("/dashboard");
     } catch (err) {
@@ -46,7 +46,8 @@ function PaymentSetup() {
   };
 
   const handleSkip = () => {
-    localStorage.setItem("paymentSetup", "true");
+    // Skip for this session only — without payout details nobody can pay you
+    // back, so the prompt should return on the next login.
     navigate("/dashboard");
   };
 

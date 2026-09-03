@@ -1,119 +1,63 @@
 const Expense = require("../models/Expense");
 const Group = require("../models/Group");
+const { computeBalances, computeSettlements } = require("../utils/balances");
+
+const loadLedger = async (groupId) => {
+  const group = await Group.findById(groupId).populate("members", "name email");
+  if (!group) return null;
+
+  const expenses = await Expense.find({ group: groupId });
+  const balances = computeBalances(group.members, expenses);
+
+  const labelById = {};
+  group.members.forEach((m) => {
+    labelById[m._id.toString()] = m.email;
+  });
+
+  return { group, expenses, balances, labelById };
+};
 
 const getBalances = async (req, res) => {
   try {
     const { groupId } = req.params;
 
-    const group = await Group.findById(groupId).populate("members", "name email");
-    if (!group) return res.status(404).json({ msg: "Group not found" });
+    const ledger = await loadLedger(groupId);
+    if (!ledger) return res.status(404).json({ msg: "Group not found" });
 
-    const expenses = await Expense.find({ group: groupId }).populate(
-      "participants.user",
-      "email"
-    );
+    if (!ledger.group.members.some((m) => m._id.toString() === req.user.id)) {
+      return res.status(403).json({ msg: "Access denied" });
+    }
 
-    // FIX: use per-expense participant logic, not total / number-of-members
-    let balances = {};
-    group.members.forEach((m) => {
-      balances[m._id.toString()] = { email: m.email, balance: 0 };
+    // Keep the original shape: id -> { email, balance }
+    const out = {};
+    ledger.group.members.forEach((m) => {
+      const id = m._id.toString();
+      out[id] = { email: m.email, balance: ledger.balances[id] };
     });
 
-    expenses.forEach((e) => {
-      if (!e.participants || e.participants.length === 0) return;
-      const split = e.amount / e.participants.length;
-      const payerId = e.paidBy.toString();
-
-      if (balances[payerId] !== undefined) {
-        balances[payerId].balance += e.amount;
-      }
-
-      e.participants.forEach((p) => {
-        const uid = p.user._id ? p.user._id.toString() : p.user.toString();
-        if (balances[uid] !== undefined) {
-          balances[uid].balance -= split;
-        }
-      });
-    });
-
-    Object.keys(balances).forEach((id) => {
-      balances[id].balance = parseFloat(balances[id].balance.toFixed(2));
-    });
-
-    res.json(balances);
+    res.json(out);
   } catch (err) {
-    console.error(err);
+    console.error("GET BALANCES ERROR:", err);
     res.status(500).json({ msg: "Error calculating balance" });
   }
 };
 
-// FIX: settleUp was defined AFTER the first module.exports — moved here so it's always exported
 const settleUp = async (req, res) => {
   try {
     const { groupId } = req.params;
 
-    const group = await Group.findById(groupId).populate("members", "name email");
-    if (!group) return res.status(404).json({ msg: "Group not found" });
+    const ledger = await loadLedger(groupId);
+    if (!ledger) return res.status(404).json({ msg: "Group not found" });
 
-    const expenses = await Expense.find({ group: groupId });
-
-    let balances = {};
-    group.members.forEach((m) => {
-      balances[m._id.toString()] = { email: m.email, balance: 0 };
-    });
-
-    // FIX: per-expense split logic (same as above)
-    expenses.forEach((e) => {
-      if (!e.participants || e.participants.length === 0) return;
-      const split = e.amount / e.participants.length;
-      const payerId = e.paidBy.toString();
-
-      if (balances[payerId] !== undefined) {
-        balances[payerId].balance += e.amount;
-      }
-
-      e.participants.forEach((p) => {
-        const uid = p.user.toString();
-        if (balances[uid] !== undefined) {
-          balances[uid].balance -= split;
-        }
-      });
-    });
-
-    let creditors = [];
-    let debtors = [];
-
-    Object.entries(balances).forEach(([id, data]) => {
-      const bal = parseFloat(data.balance.toFixed(2));
-      if (bal > 0.001) creditors.push({ id, email: data.email, balance: bal });
-      else if (bal < -0.001) debtors.push({ id, email: data.email, balance: bal });
-    });
-
-    let settlements = [];
-    let i = 0, j = 0;
-
-    while (i < debtors.length && j < creditors.length) {
-      const amount = Math.min(Math.abs(debtors[i].balance), creditors[j].balance);
-
-      settlements.push({
-        from: debtors[i].email,
-        to: creditors[j].email,
-        amount: parseFloat(amount.toFixed(2)),
-      });
-
-      debtors[i].balance += amount;
-      creditors[j].balance -= amount;
-
-      if (Math.abs(debtors[i].balance) < 0.001) i++;
-      if (Math.abs(creditors[j].balance) < 0.001) j++;
+    if (!ledger.group.members.some((m) => m._id.toString() === req.user.id)) {
+      return res.status(403).json({ msg: "Access denied" });
     }
 
-    res.json(settlements);
+    res.json(computeSettlements(ledger.balances, ledger.labelById));
   } catch (err) {
-    console.error(err);
+    console.error("SETTLE UP ERROR:", err);
     res.status(500).json({ msg: "Settlement error" });
   }
 };
 
-// FIX: single export at bottom — original had module.exports before settleUp was defined
 module.exports = { getBalances, settleUp };

@@ -1,4 +1,18 @@
+const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+
+const signToken = (user) =>
+  jwt.sign(
+    {
+      id: user._id,
+      email: user.email,
+      name: user.name,
+      paymentSetup: user.paymentSetup,
+      isVerified: user.isVerified,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
 
 const savePayment = async (req, res) => {
   try {
@@ -6,6 +20,10 @@ const savePayment = async (req, res) => {
 
     if (!upiId && !qrCode && !phone) {
       return res.status(400).json({ msg: "At least one payment detail is required" });
+    }
+
+    if (phone && !/^\d{10}$/.test(String(phone).trim())) {
+      return res.status(400).json({ msg: "Enter a valid 10-digit phone number" });
     }
 
     const user = await User.findById(req.user.id);
@@ -22,9 +40,15 @@ const savePayment = async (req, res) => {
 
     await user.save();
 
-    res.json({ msg: "Payment details saved", payment: user.payment });
+    // Hand back a refreshed token: the old one still says paymentSetup:false and
+    // would send the user back through setup on their next login.
+    res.json({
+      msg: "Payment details saved",
+      payment: user.payment,
+      token: signToken(user),
+    });
   } catch (err) {
-    console.error(err);
+    console.error("SAVE PAYMENT ERROR:", err);
     res.status(500).json({ msg: "Error saving payment" });
   }
 };
@@ -36,7 +60,7 @@ const getMyPayment = async (req, res) => {
 
     res.json({ payment: user.payment || {}, paymentSetup: user.paymentSetup || false });
   } catch (err) {
-    console.error(err);
+    console.error("GET PAYMENT ERROR:", err);
     res.status(500).json({ msg: "Error fetching payment" });
   }
 };
