@@ -14,7 +14,7 @@ const mongoose = require("mongoose");
 const nodemailer = require("nodemailer");
 const Razorpay = require("razorpay");
 
-const { smtpConfigured } = require("../src/utils/email");
+const { smtpConfigured, activeTransport, sendMail } = require("../src/utils/email");
 
 const pass = (m) => console.log(`  ✅ ${m}`);
 const warn = (m) => console.log(`  ⚠️  ${m}`);
@@ -68,29 +68,44 @@ const checkSecrets = () => {
 };
 
 const checkEmail = async (recipient) => {
-  console.log("\nEmail (SMTP)");
+  const transport = activeTransport();
+  console.log(`\nEmail (${transport || "not configured"})`);
 
-  if (!smtpConfigured()) {
+  if (!transport) {
     warn(
-      "SMTP is not configured. Signup and password reset still work, but links " +
-        "are printed to the server console instead of being emailed."
+      "No mail transport is configured. Signup and password reset still work, " +
+        "but links are printed to the server console instead of being emailed. " +
+        "Set BREVO_API_KEY or RESEND_API_KEY, or SMTP_HOST/SMTP_USER/SMTP_PASS."
     );
     return;
   }
 
-  const port = Number(process.env.SMTP_PORT || 587);
-  const transport = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port,
-    secure: port === 465,
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-  });
+  if (transport === "smtp") {
+    const port = Number(process.env.SMTP_PORT || 587);
+    const smtp = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port,
+      secure: port === 465,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      connectionTimeout: 15000,
+      greetingTimeout: 10000,
+      socketTimeout: 20000,
+    });
 
-  try {
-    await transport.verify();
-    pass(`${process.env.SMTP_HOST}:${port} accepted the credentials`);
-  } catch (err) {
-    return fail(`SMTP rejected the connection: ${err.message}`);
+    try {
+      await smtp.verify();
+      pass(`${process.env.SMTP_HOST}:${port} accepted the credentials`);
+    } catch (err) {
+      fail(`SMTP rejected the connection: ${err.message}`);
+      if (/timeout|ETIMEDOUT|ECONNREFUSED/i.test(err.message)) {
+        warn(
+          "That looks like a blocked port rather than bad credentials. Many hosts " +
+            "(including Render's free instances) block outbound SMTP — use " +
+            "BREVO_API_KEY or RESEND_API_KEY there instead."
+        );
+      }
+      return;
+    }
   }
 
   if (!recipient) {
@@ -98,17 +113,16 @@ const checkEmail = async (recipient) => {
     return;
   }
 
-  try {
-    const info = await transport.sendMail({
-      from: process.env.MAIL_FROM || `"Expense Splitter" <${process.env.SMTP_USER}>`,
-      to: recipient,
-      subject: "Expense Splitter — test email",
-      text: "If you're reading this, outgoing email is working.",
-    });
-    pass(`test email sent to ${recipient} (${info.messageId})`);
-  } catch (err) {
-    fail(`could not send: ${err.message}`);
-  }
+  // Goes through the app's own sender, so this tests the real code path.
+  const result = await sendMail({
+    to: recipient,
+    subject: "Expense Splitter — test email",
+    text: "If you're reading this, outgoing email is working.",
+    html: "<p>If you're reading this, outgoing email is working.</p>",
+  });
+
+  if (result.delivered) pass(`test email sent to ${recipient} (${result.messageId})`);
+  else fail(`could not send via ${transport}: ${result.reason}`);
 };
 
 const checkPayments = async () => {

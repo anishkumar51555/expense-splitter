@@ -9,10 +9,13 @@ const { MongoMemoryServer } = require("mongodb-memory-server");
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret-do-not-use-in-production";
 process.env.APP_URL = "http://localhost:5173";
 
-// Keep SMTP unconfigured so nothing is ever actually emailed during a test run.
+// Keep every mail transport unconfigured so nothing is ever actually emailed
+// during a test run — the HTTPS providers would otherwise send for real.
 delete process.env.SMTP_HOST;
 delete process.env.SMTP_USER;
 delete process.env.SMTP_PASS;
+delete process.env.BREVO_API_KEY;
+delete process.env.RESEND_API_KEY;
 
 let mongod;
 

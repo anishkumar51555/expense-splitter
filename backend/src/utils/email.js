@@ -1,17 +1,45 @@
 const nodemailer = require("nodemailer");
 
 /**
- * Mail delivery over SMTP.
+ * Mail delivery, over an HTTPS provider API where one is configured and SMTP
+ * otherwise.
  *
- * Set SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS and mail goes out for real.
- * With no credentials configured we fall back to logging the link, so signup and
- * password reset stay usable in local development and in tests.
+ * Many hosts (Render's free instances among them) block outbound SMTP ports to
+ * curb spam, which makes port 587 hang until it times out. Set BREVO_API_KEY or
+ * RESEND_API_KEY and delivery goes over HTTPS instead, which those hosts allow.
+ * SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS still work wherever SMTP is
+ * reachable, such as local development.
+ *
+ * With nothing configured we fall back to logging the link, so signup and
+ * password reset stay usable in development and in tests.
  */
 
 let cachedTransport;
 
 const smtpConfigured = () =>
   Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+
+// An HTTPS provider is preferred: it works on hosts that block SMTP.
+const httpProvider = () => {
+  if (process.env.BREVO_API_KEY) return "brevo";
+  if (process.env.RESEND_API_KEY) return "resend";
+  return null;
+};
+
+const emailConfigured = () => Boolean(httpProvider()) || smtpConfigured();
+
+const activeTransport = () => httpProvider() || (smtpConfigured() ? "smtp" : null);
+
+// MAIL_FROM may be `Name <addr>`, `"Name" <addr>` or a bare address. Dashboards
+// keep the quotes that a .env file would strip, so tolerate them.
+const parseFrom = () => {
+  const raw = (process.env.MAIL_FROM || "").trim();
+  const fallback = process.env.SMTP_USER || "";
+  const match = raw.match(/^"?([^"<]*?)"?\s*<([^>]+)>$/);
+  if (match) return { name: match[1].trim() || "Expense Splitter", email: match[2].trim() };
+  const bare = raw.replace(/^"|"$/g, "").trim();
+  return { name: "Expense Splitter", email: bare || fallback };
+};
 
 const getTransport = () => {
   if (cachedTransport) return cachedTransport;
@@ -26,23 +54,73 @@ const getTransport = () => {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
+    // Without these a blocked port hangs the request for two minutes.
+    connectionTimeout: 15000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000,
   });
 
   return cachedTransport;
 };
 
+const postJson = async (url, headers, body) => {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...headers },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20000),
+  });
+  const raw = await res.text();
+  if (!res.ok) throw new Error(`${res.status} ${raw.slice(0, 300)}`);
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+};
+
+const sendViaBrevo = async ({ to, subject, html, text }) => {
+  const from = parseFrom();
+  const out = await postJson(
+    "https://api.brevo.com/v3/smtp/email",
+    { "api-key": process.env.BREVO_API_KEY, accept: "application/json" },
+    { sender: from, to: [{ email: to }], subject, htmlContent: html, textContent: text }
+  );
+  return out.messageId || "brevo-accepted";
+};
+
+const sendViaResend = async ({ to, subject, html, text }) => {
+  const from = parseFrom();
+  const out = await postJson(
+    "https://api.resend.com/emails",
+    { authorization: `Bearer ${process.env.RESEND_API_KEY}` },
+    { from: `${from.name} <${from.email}>`, to: [to], subject, html, text }
+  );
+  return out.id || "resend-accepted";
+};
+
 const appUrl = () => (process.env.APP_URL || "http://localhost:5173").replace(/\/$/, "");
 
 const sendMail = async ({ to, subject, html, text }) => {
-  if (!smtpConfigured()) {
-    // No SMTP set up — surface the link instead of silently dropping it.
-    console.log(`\n📧 [email not sent — SMTP not configured]\n   To: ${to}\n   Subject: ${subject}\n   ${text}\n`);
-    return { delivered: false, reason: "smtp-not-configured" };
+  const transport = activeTransport();
+
+  if (!transport) {
+    // Nothing configured — surface the link instead of silently dropping it.
+    console.log(`\n📧 [email not sent — no mail transport configured]\n   To: ${to}\n   Subject: ${subject}\n   ${text}\n`);
+    return { delivered: false, reason: "email-not-configured" };
   }
 
   try {
+    if (transport === "brevo") {
+      return { delivered: true, messageId: await sendViaBrevo({ to, subject, html, text }) };
+    }
+    if (transport === "resend") {
+      return { delivered: true, messageId: await sendViaResend({ to, subject, html, text }) };
+    }
+
+    const from = parseFrom();
     const info = await getTransport().sendMail({
-      from: process.env.MAIL_FROM || `"Expense Splitter" <${process.env.SMTP_USER}>`,
+      from: `"${from.name}" <${from.email}>`,
       to,
       subject,
       text,
@@ -51,7 +129,9 @@ const sendMail = async ({ to, subject, html, text }) => {
     return { delivered: true, messageId: info.messageId };
   } catch (err) {
     // A mail outage must not take down signup — the user can ask for a resend.
-    console.error("EMAIL SEND ERROR:", err.message);
+    console.error(`EMAIL SEND ERROR (${transport}):`, err.message);
+    // The link would otherwise be lost entirely when delivery fails.
+    console.log(`\n📧 [delivery failed — link below]\n   To: ${to}\n   ${text}\n`);
     return { delivered: false, reason: err.message };
   }
 };
@@ -108,5 +188,7 @@ module.exports = {
   sendVerificationEmail,
   sendPasswordResetEmail,
   smtpConfigured,
+  emailConfigured,
+  activeTransport,
   appUrl,
 };
