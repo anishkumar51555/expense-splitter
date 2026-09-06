@@ -34,7 +34,8 @@ function AppContent() {
           <Route path="/register" element={<Register />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/join/:code" element={<PrivateRoute><JoinGroup /></PrivateRoute>} />
+          {/* Public: an invite has to survive being opened while logged out. */}
+          <Route path="/join/:code" element={<JoinGroup />} />
 
           {/* Protected */}
           <Route path="/payment-setup" element={<PrivateRoute><PaymentSetup /></PrivateRoute>} />

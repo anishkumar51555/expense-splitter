@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import API from "../api/api";
+import { landingRoute } from "../utils/pendingInvite";
 
 /**
  * Landing page for the link in the verification email.
@@ -32,7 +33,7 @@ function VerifyEmail() {
 
         const decoded = JSON.parse(atob(res.data.token.split(".")[1]));
         setTimeout(
-          () => navigate(decoded.paymentSetup ? "/dashboard" : "/payment-setup"),
+          () => navigate(landingRoute(decoded.paymentSetup)),
           1600
         );
       } catch (err) {

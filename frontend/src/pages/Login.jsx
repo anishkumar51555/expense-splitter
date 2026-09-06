@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../api/api";
+import { landingRoute } from "../utils/pendingInvite";
 
 function Login() {
   const [email, setEmail] = useState("");
@@ -31,7 +32,7 @@ function Login() {
       localStorage.setItem("token", res.data.token);
 
       const decoded = JSON.parse(atob(res.data.token.split(".")[1]));
-      navigate(decoded.paymentSetup ? "/dashboard" : "/payment-setup");
+      navigate(landingRoute(decoded.paymentSetup));
     } catch (err) {
       if (err.response?.data?.needsVerification) {
         setUnverified(err.response.data.email || email);

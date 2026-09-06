@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../api/api";
+import { landingRoute } from "../utils/pendingInvite";
 
 function PaymentSetup() {
   const [upi, setUpi] = useState("");
@@ -37,7 +38,7 @@ function PaymentSetup() {
       // login goes straight to the dashboard.
       if (res.data?.token) localStorage.setItem("token", res.data.token);
 
-      navigate("/dashboard");
+      navigate(landingRoute(true));
     } catch (err) {
       setError(err.response?.data?.msg || "Error saving. Please try again.");
     } finally {
