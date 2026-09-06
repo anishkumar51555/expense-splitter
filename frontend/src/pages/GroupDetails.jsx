@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import API from "../api/api";
+import GroupChat from "../components/GroupChat";
 import { previewSplit, SPLIT_TYPES } from "../utils/split";
 
 const CATEGORIES = [
@@ -382,6 +383,7 @@ function GroupDetails() {
         {[
           { key: "expenses", label: "💸 Expenses" },
           { key: "settlements", label: "🤝 Settle" },
+          { key: "chat", label: "💬 Chat" },
           { key: "members", label: "👥 Members" },
         ].map((tab) => (
           <button
@@ -743,6 +745,11 @@ function GroupDetails() {
       )}
 
       {/* ── MEMBERS TAB ── */}
+      {/* ── CHAT TAB ── */}
+      {activeTab === "chat" && (
+        <GroupChat groupId={id} currentUserId={currentUserId} />
+      )}
+
       {activeTab === "members" && (
         <div className="space-y-3">
           {/* Add Member Card */}

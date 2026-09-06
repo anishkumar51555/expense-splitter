@@ -29,12 +29,14 @@ const groupRoutes = require("./routes/groupRoutes");
 const expenseRoutes = require("./routes/expenseRoutes");
 const balanceRoutes = require("./routes/balanceRoutes");
 const userRoutes = require("./routes/userRoutes");
+const messageRoutes = require("./routes/messageRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/groups", groupRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/balances", balanceRoutes);
 app.use("/api/user", userRoutes);
+app.use("/api/messages", messageRoutes);
 
 app.get("/", (req, res) => res.send("API Running 🚀"));
 
