@@ -27,9 +27,13 @@ beforeEach(() => {
 });
 
 const signUp = (over = {}) =>
-  request(app)
-    .post("/api/auth/register")
-    .send({ name: "Asha", email: "asha@example.com", password: "password123", ...over });
+  request(app).post("/api/auth/register").send({
+    name: "Asha",
+    email: "asha@example.com",
+    password: "password123",
+    payment: { upiId: "asha@upi" },
+    ...over,
+  });
 
 describe("registration", () => {
   it("creates an unverified account and emails a verification link", async () => {
@@ -386,5 +390,75 @@ describe("login", () => {
   it("requires a token on protected routes", async () => {
     await request(app).get("/api/groups").expect(401);
     await request(app).get("/api/groups").set("Authorization", "Bearer nonsense").expect(401);
+  });
+});
+
+describe("payment details at signup", () => {
+  it("refuses an account with no way to be paid", async () => {
+    const res = await signUp({ payment: {} }).expect(400);
+
+    expect(res.body.msg).toMatch(/at least one payment detail/i);
+    expect(await User.countDocuments({ email: "asha@example.com" })).toBe(0);
+  });
+
+  it("refuses when the payment field is missing entirely", async () => {
+    const res = await request(app)
+      .post("/api/auth/register")
+      .send({ name: "Asha", email: "asha@example.com", password: "password123" })
+      .expect(400);
+
+    expect(res.body.msg).toMatch(/at least one payment detail/i);
+  });
+
+  it("accepts a UPI id on its own", async () => {
+    await signUp({ payment: { upiId: "asha@okaxis" } }).expect(201);
+
+    const user = await User.findOne({ email: "asha@example.com" });
+    expect(user.payment.upiId).toBe("asha@okaxis");
+    expect(user.paymentSetup).toBe(true);
+  });
+
+  it("accepts a phone number on its own", async () => {
+    await signUp({ payment: { phone: "9876543210" } }).expect(201);
+
+    const user = await User.findOne({ email: "asha@example.com" });
+    expect(user.payment.phone).toBe("9876543210");
+  });
+
+  it("accepts a QR code on its own", async () => {
+    await signUp({ payment: { qrCode: "data:image/png;base64,iVBORw0KGgo=" } }).expect(201);
+
+    const user = await User.findOne({ email: "asha@example.com" });
+    expect(user.payment.qrCode).toMatch(/^data:image\/png/);
+  });
+
+  it("rejects a phone number that is not ten digits", async () => {
+    const res = await signUp({ payment: { phone: "98765" } }).expect(400);
+
+    expect(res.body.msg).toMatch(/10-digit/i);
+    expect(await User.countDocuments({ email: "asha@example.com" })).toBe(0);
+  });
+
+  it("trims surrounding whitespace off the details", async () => {
+    await signUp({ payment: { upiId: "  asha@okaxis  ", phone: " 9876543210 " } }).expect(201);
+
+    const user = await User.findOne({ email: "asha@example.com" });
+    expect(user.payment.upiId).toBe("asha@okaxis");
+    expect(user.payment.phone).toBe("9876543210");
+  });
+
+  it("goes straight past the payment-setup prompt on login", async () => {
+    await signUp({ payment: { upiId: "asha@okaxis" } }).expect(201);
+    await User.updateOne({ email: "asha@example.com" }, { $set: { isVerified: true } });
+
+    const login = await request(app)
+      .post("/api/auth/login")
+      .send({ email: "asha@example.com", password: "password123" })
+      .expect(200);
+
+    const claims = JSON.parse(
+      Buffer.from(login.body.token.split(".")[1], "base64").toString()
+    );
+    expect(claims.paymentSetup).toBe(true);
   });
 });

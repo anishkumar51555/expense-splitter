@@ -4,11 +4,21 @@ import { useNavigate, Link } from "react-router-dom";
 
 function Register() {
   const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [pay, setPay] = useState({ upiId: "", phone: "" });
+  const [qr, setQr] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [registered, setRegistered] = useState(null);
   const [resendState, setResendState] = useState("idle");
   const navigate = useNavigate();
+
+  const handleQrUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => setQr(reader.result);
+    reader.readAsDataURL(file);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -17,9 +27,19 @@ function Register() {
     if (!form.name || !form.email || !form.password) return setError("Please fill all fields");
     if (form.password.length < 6) return setError("Password must be at least 6 characters");
 
+    if (!pay.upiId.trim() && !pay.phone.trim() && !qr) {
+      return setError("Add at least one payment detail so people can pay you back");
+    }
+    if (pay.phone && !/^\d{10}$/.test(pay.phone.trim())) {
+      return setError("Enter a valid 10-digit phone number");
+    }
+
     setLoading(true);
     try {
-      const res = await API.post("/auth/register", form);
+      const res = await API.post("/auth/register", {
+        ...form,
+        payment: { upiId: pay.upiId, phone: pay.phone, qrCode: qr },
+      });
       setRegistered({ email: form.email, emailSent: res.data.emailSent });
     } catch (err) {
       setError(err.response?.data?.msg || "Registration failed");
@@ -123,6 +143,56 @@ function Register() {
             className="w-full bg-white text-gray-800 placeholder-gray-400 px-4 py-3 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-400"
             onChange={(e) => setForm({ ...form, password: e.target.value })}
           />
+
+          {/* Collected now rather than later: without it nobody can pay this
+              person back, and the prompt is easy to dismiss after signup. */}
+          <div className="border-t border-white/10 pt-4 mt-1">
+            <p className="text-white font-semibold text-sm">How should people pay you back?</p>
+            <p className="text-white/50 text-xs mt-1 mb-3">
+              Add at least one. Group members see this when they settle up with you.
+            </p>
+
+            <div className="flex flex-col gap-3">
+              <input
+                type="tel"
+                inputMode="numeric"
+                placeholder="Phone number (10 digits)"
+                value={pay.phone}
+                className="w-full bg-white text-gray-800 placeholder-gray-400 px-4 py-3 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-400"
+                onChange={(e) => setPay({ ...pay, phone: e.target.value })}
+              />
+
+              <input
+                type="text"
+                placeholder="UPI ID (yourname@upi)"
+                value={pay.upiId}
+                className="w-full bg-white text-gray-800 placeholder-gray-400 px-4 py-3 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-400"
+                onChange={(e) => setPay({ ...pay, upiId: e.target.value })}
+              />
+
+              <label className="w-full bg-white/10 border border-dashed border-white/25 text-white/70 px-4 py-3 rounded-2xl cursor-pointer hover:bg-white/15 transition text-sm text-center">
+                {qr ? "QR code added — tap to replace" : "Upload your payment QR code"}
+                <input type="file" accept="image/*" className="hidden" onChange={handleQrUpload} />
+              </label>
+
+              {qr && (
+                <div className="flex items-center gap-3">
+                  <img
+                    src={qr}
+                    alt="Your payment QR code"
+                    className="w-20 h-20 object-contain bg-white rounded-xl p-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setQr(null)}
+                    className="text-white/50 text-xs hover:text-white/80 underline"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
 
           {error && (
             <p className="text-red-400 text-sm bg-red-500/10 border border-red-400/20 rounded-xl px-4 py-3">

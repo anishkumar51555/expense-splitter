@@ -4,15 +4,13 @@
  *   node scripts/checkConfig.js                  # check everything
  *   node scripts/checkConfig.js you@example.com  # also send a real test email
  *
- * Verifies the database connects, SMTP accepts your credentials, and the
- * Razorpay keys are accepted by the gateway.
+ * Verifies the database connects and outgoing email works.
  */
 
 require("dotenv").config();
 
 const mongoose = require("mongoose");
 const nodemailer = require("nodemailer");
-const Razorpay = require("razorpay");
 
 const { smtpConfigured, activeTransport, sendMail } = require("../src/utils/email");
 
@@ -125,46 +123,6 @@ const checkEmail = async (recipient) => {
   else fail(`could not send via ${transport}: ${result.reason}`);
 };
 
-const checkPayments = async () => {
-  console.log("\nPayments (Razorpay)");
-
-  const { RAZORPAY_KEY_ID: id, RAZORPAY_KEY_SECRET: secret } = process.env;
-
-  if (!id || !secret) {
-    warn(
-      "Razorpay keys are not set. Members will settle using UPI details plus " +
-        '"Mark as Paid" instead of online checkout.'
-    );
-    return;
-  }
-
-  if (id.startsWith("rzp_test_")) pass("using TEST keys — no real money will move");
-  else if (id.startsWith("rzp_live_")) warn("using LIVE keys — real payments will be charged");
-
-  try {
-    // A ₹1 order is the cheapest way to prove the keys are accepted.
-    const client = new Razorpay({ key_id: id, key_secret: secret });
-    const order = await client.orders.create({
-      amount: 100,
-      currency: "INR",
-      receipt: `config_check_${Date.now()}`.slice(0, 40),
-    });
-    pass(`gateway accepted the keys (test order ${order.id})`);
-  } catch (err) {
-    const detail = err?.error?.description || err.message || String(err);
-    return fail(`gateway rejected the keys: ${detail}`);
-  }
-
-  if (process.env.RAZORPAY_WEBHOOK_SECRET) {
-    pass("webhook secret is set");
-  } else {
-    warn(
-      "RAZORPAY_WEBHOOK_SECRET is not set. Payments still verify through the " +
-        "browser callback; the webhook is a backup for when the browser drops out."
-    );
-  }
-};
-
 const run = async () => {
   const recipient = process.argv[2];
 
@@ -173,7 +131,6 @@ const run = async () => {
   checkSecrets();
   await checkDatabase();
   await checkEmail(recipient);
-  await checkPayments();
 
   console.log(
     process.exitCode === 1

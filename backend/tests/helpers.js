@@ -6,8 +6,18 @@ const User = require("../src/models/User");
  * Register a user, verify them, and log in — the state most tests want to
  * start from. Returns the auth token plus the user document.
  */
-const createVerifiedUser = async ({ name, email, password = "password123" }) => {
-  await request(app).post("/api/auth/register").send({ name, email, password }).expect(201);
+const createVerifiedUser = async ({
+  name,
+  email,
+  password = "password123",
+  // Signup requires somewhere to be paid; tests that care about the details
+  // themselves pass their own.
+  payment = { upiId: `${email.split("@")[0]}@upi` },
+}) => {
+  await request(app)
+    .post("/api/auth/register")
+    .send({ name, email, password, payment })
+    .expect(201);
 
   // Mark verified directly; the verification flow itself is covered in auth.test.js.
   await User.updateOne(

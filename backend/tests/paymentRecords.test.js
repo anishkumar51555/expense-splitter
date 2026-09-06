@@ -4,9 +4,10 @@ const Payment = require("../src/models/Payment");
 /**
  * Index behaviour on the Payment collection.
  *
- * Gateway ids must be unique so a retried verify call can't record the same
- * payment twice, but manual settlements carry no gateway id at all and must
- * never collide with each other.
+ * Settlement happens outside the app, so a row records that two people squared
+ * up. Recording the same person settling the same expense twice would
+ * double-count it, so the pair is unique — but that must not stop different
+ * people settling the same expense, or one person settling several.
  */
 
 const oid = () => new mongoose.Types.ObjectId();
@@ -17,6 +18,7 @@ const base = () => ({
   paidBy: oid(),
   paidTo: oid(),
   status: "captured",
+  method: "manual",
 });
 
 beforeAll(async () => {
@@ -24,71 +26,47 @@ beforeAll(async () => {
   await Payment.init();
 });
 
-describe("manual settlements", () => {
-  it("allows many, since none of them carry a gateway id", async () => {
-    await Payment.create({ ...base(), amount: 10, method: "manual" });
-    await Payment.create({ ...base(), amount: 20, method: "manual" });
-    await Payment.create({ ...base(), amount: 30, method: "manual" });
+describe("settlement records", () => {
+  it("records one settlement per person per expense", async () => {
+    await Payment.create({ ...base(), amount: 10 });
+    await Payment.create({ ...base(), amount: 20 });
+    await Payment.create({ ...base(), amount: 30 });
 
-    expect(await Payment.countDocuments({ method: "manual" })).toBe(3);
+    expect(await Payment.countDocuments()).toBe(3);
   });
-});
 
-describe("gateway settlements", () => {
-  it("refuses to record the same payment id twice", async () => {
-    await Payment.create({
-      ...base(),
-      amount: 60,
-      method: "razorpay",
-      razorpayOrderId: "order_A",
-      razorpayPaymentId: "pay_A",
-    });
+  it("refuses to record the same person settling one expense twice", async () => {
+    const expense = oid();
+    const paidBy = oid();
+
+    await Payment.create({ ...base(), expense, paidBy, amount: 60 });
 
     await expect(
-      Payment.create({
-        ...base(),
-        amount: 60,
-        method: "razorpay",
-        razorpayOrderId: "order_B",
-        razorpayPaymentId: "pay_A",
-      })
+      Payment.create({ ...base(), expense, paidBy, amount: 60 })
     ).rejects.toThrow(/duplicate key/i);
   });
 
-  it("refuses to record the same order twice", async () => {
-    await Payment.create({
-      ...base(),
-      amount: 60,
-      method: "razorpay",
-      razorpayOrderId: "order_C",
-    });
+  it("lets different people settle the same expense", async () => {
+    const expense = oid();
 
-    await expect(
-      Payment.create({
-        ...base(),
-        amount: 60,
-        method: "razorpay",
-        razorpayOrderId: "order_C",
-      })
-    ).rejects.toThrow(/duplicate key/i);
+    await Payment.create({ ...base(), expense, paidBy: oid(), amount: 25 });
+    await Payment.create({ ...base(), expense, paidBy: oid(), amount: 25 });
+
+    expect(await Payment.countDocuments({ expense })).toBe(2);
   });
 
-  it("allows several pending orders that have no payment id yet", async () => {
-    await Payment.create({
-      ...base(),
-      amount: 60,
-      method: "razorpay",
-      status: "created",
-      razorpayOrderId: "order_D",
-    });
-    await Payment.create({
-      ...base(),
-      amount: 30,
-      method: "razorpay",
-      status: "created",
-      razorpayOrderId: "order_E",
-    });
+  it("lets one person settle several expenses", async () => {
+    const paidBy = oid();
 
-    expect(await Payment.countDocuments({ status: "created" })).toBe(2);
+    await Payment.create({ ...base(), paidBy, amount: 15 });
+    await Payment.create({ ...base(), paidBy, amount: 45 });
+
+    expect(await Payment.countDocuments({ paidBy })).toBe(2);
+  });
+
+  it("only accepts the manual method", async () => {
+    await expect(
+      Payment.create({ ...base(), amount: 10, method: "razorpay" })
+    ).rejects.toThrow(/validation/i);
   });
 });

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import API from "../api/api";
-import { payViaRazorpay, fetchPaymentConfig } from "../api/razorpay";
 import { previewSplit, SPLIT_TYPES } from "../utils/split";
 
 const CATEGORIES = [
@@ -52,10 +51,8 @@ function GroupDetails() {
   const [inviteCopied, setInviteCopied] = useState(false);
   const [payModal, setPayModal] = useState(null);
   const [markingPaid, setMarkingPaid] = useState(false);
-  const [payingOnline, setPayingOnline] = useState(false);
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [memberEmail, setMemberEmail] = useState("");
-  const [gateway, setGateway] = useState({ enabled: false });
 
   const fetchData = async () => {
     try {
@@ -78,7 +75,6 @@ function GroupDetails() {
 
   useEffect(() => {
     fetchData();
-    fetchPaymentConfig().then(setGateway);
   }, []);
 
   const me = useMemo(
@@ -196,26 +192,6 @@ function GroupDetails() {
     });
   };
 
-  const handlePayOnline = async () => {
-    setPayingOnline(true);
-    try {
-      const result = await payViaRazorpay({
-        expenseId: payModal.expenseId,
-        user: me,
-      });
-
-      if (result.status === "paid") {
-        setPayModal(null);
-        fetchData();
-      }
-      // "dismissed" just closes checkout; leave the modal open.
-    } catch (err) {
-      setPayModal((prev) => ({ ...prev, error: err.message }));
-    } finally {
-      setPayingOnline(false);
-    }
-  };
-
   const handleMarkPaid = async () => {
     setMarkingPaid(true);
     try {
@@ -298,30 +274,6 @@ function GroupDetails() {
               </p>
             )}
 
-            {/* Online payment — the real settlement path */}
-            {gateway.enabled && (
-              <>
-                <button
-                  onClick={handlePayOnline}
-                  disabled={payingOnline}
-                  className="w-full py-3.5 rounded-2xl bg-purple-600 text-white font-bold hover:bg-purple-700 transition disabled:opacity-50 shadow-lg shadow-purple-200 mb-2"
-                >
-                  {payingOnline
-                    ? "Opening payment…"
-                    : `Pay ₹${payModal.amount.toFixed(2)} online`}
-                </button>
-                <p className="text-xs text-center text-gray-400 mb-4">
-                  UPI, card or netbanking — settles automatically
-                </p>
-
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="flex-1 h-px bg-gray-200" />
-                  <span className="text-xs text-gray-400 font-medium">or pay directly</span>
-                  <div className="flex-1 h-px bg-gray-200" />
-                </div>
-              </>
-            )}
-
             {/* Direct transfer details */}
             {payModal.phone && (
               <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-3">
@@ -368,7 +320,7 @@ function GroupDetails() {
             )}
 
             <p className="text-xs text-center text-gray-400 mb-4">
-              Already sent the money? Record it below.
+              Pay {payModal.payerName} using the details above, then record it below.
             </p>
 
             <div className="flex gap-3">

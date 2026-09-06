@@ -27,11 +27,11 @@ const paymentSchema = new mongoose.Schema(
       required: true,
     },
 
-    // "razorpay" once money moved through the gateway; "manual" when the two
-    // settled outside the app (cash, direct UPI) and just recorded it here.
+    // Settlement always happens outside the app now — cash, UPI or a bank
+    // transfer — and is simply recorded here once both sides agree.
     method: {
       type: String,
-      enum: ["manual", "razorpay"],
+      enum: ["manual"],
       default: "manual",
     },
     status: {
@@ -39,27 +39,12 @@ const paymentSchema = new mongoose.Schema(
       enum: ["created", "captured", "failed"],
       default: "captured",
     },
-
-    // ── Razorpay bookkeeping ──
-    razorpayOrderId: { type: String, default: null },
-    razorpayPaymentId: { type: String, default: null },
   },
   { timestamps: true }
 );
 
-// A gateway payment must only ever be recorded once, however many times the
-// verify call is retried.
-//
-// These are partial rather than sparse on purpose: a sparse index only skips
-// documents where the field is *absent*, so every manual settlement — which
-// stores an explicit null — would collide on the second one. Restricting the
-// index to string values leaves manual settlements out of it entirely.
-const onlyRealIds = (field) => ({
-  unique: true,
-  partialFilterExpression: { [field]: { $type: "string" } },
-});
-
-paymentSchema.index({ razorpayPaymentId: 1 }, onlyRealIds("razorpayPaymentId"));
-paymentSchema.index({ razorpayOrderId: 1 }, onlyRealIds("razorpayOrderId"));
+// One settlement row per expense/payer pair; recording it twice is a no-op
+// rather than a duplicate.
+paymentSchema.index({ expense: 1, paidBy: 1 }, { unique: true });
 
 module.exports = mongoose.model("Payment", paymentSchema);

@@ -1,7 +1,6 @@
 const express = require("express");
 const cors = require("cors");
 
-const { handleWebhook } = require("./controllers/paymentController");
 
 const app = express();
 
@@ -22,14 +21,6 @@ app.use(
   })
 );
 
-// The Razorpay webhook signature covers the exact bytes we were sent, so this
-// route needs the raw body and must be mounted before the JSON parser.
-app.post(
-  "/api/payments/webhook",
-  express.raw({ type: "application/json" }),
-  handleWebhook
-);
-
 app.use(express.json({ limit: "5mb" }));
 
 // Routes — all grouped before server starts
@@ -38,14 +29,12 @@ const groupRoutes = require("./routes/groupRoutes");
 const expenseRoutes = require("./routes/expenseRoutes");
 const balanceRoutes = require("./routes/balanceRoutes");
 const userRoutes = require("./routes/userRoutes");
-const paymentRoutes = require("./routes/paymentRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/groups", groupRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/balances", balanceRoutes);
 app.use("/api/user", userRoutes);
-app.use("/api/payments", paymentRoutes);
 
 app.get("/", (req, res) => res.send("API Running 🚀"));
 

@@ -26,7 +26,7 @@ const signToken = (user) =>
 
 exports.register = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, payment = {} } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ msg: "All fields are required" });
@@ -36,6 +36,22 @@ exports.register = async (req, res) => {
     }
     if (password.length < 6) {
       return res.status(400).json({ msg: "Password must be at least 6 characters" });
+    }
+
+    // Payout details are collected up front: a member who owes money needs
+    // somewhere to send it, and chasing people for a UPI ID afterwards is the
+    // step that stalls settling.
+    const upiId = String(payment.upiId || "").trim();
+    const phone = String(payment.phone || "").trim();
+    const qrCode = payment.qrCode || "";
+
+    if (!upiId && !phone && !qrCode) {
+      return res.status(400).json({
+        msg: "Add at least one payment detail: a UPI ID, a phone number or a QR code",
+      });
+    }
+    if (phone && !/^\d{10}$/.test(phone)) {
+      return res.status(400).json({ msg: "Enter a valid 10-digit phone number" });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
@@ -54,6 +70,8 @@ exports.register = async (req, res) => {
       isVerified: false,
       verificationTokenHash: token.hash,
       verificationExpires: token.expiresAt,
+      payment: { upiId, phone, qrCode },
+      paymentSetup: true,
     });
 
     const delivery = await sendVerificationEmail(user, token.raw);
