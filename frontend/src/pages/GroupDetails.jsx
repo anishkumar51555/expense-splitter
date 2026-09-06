@@ -54,6 +54,7 @@ function GroupDetails() {
   const [markingPaid, setMarkingPaid] = useState(false);
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [memberEmail, setMemberEmail] = useState("");
+  const [unread, setUnread] = useState(0);
 
   const fetchData = async () => {
     try {
@@ -173,7 +174,39 @@ function GroupDetails() {
     }
   };
 
+  // Watch for messages only while the chat tab is closed; with it open,
+  // GroupChat is already polling and marking them read.
+  useEffect(() => {
+    if (activeTab === "chat") {
+      setUnread(0);
+      return;
+    }
+
+    let active = true;
+    const check = async () => {
+      try {
+        const res = await API.get(`/messages/${id}/unread`);
+        if (active) setUnread(res.data.count || 0);
+      } catch {
+        // A dropped check is not worth surfacing; the next one will catch up.
+      }
+    };
+
+    check();
+    const timer = setInterval(check, 10000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [activeTab, id]);
+
   const copyInviteLink = () => {
+    // Belt and braces: the server issues a code on read, so this should not
+    // happen — but copying "/join/undefined" is worse than saying so.
+    if (!group?.inviteCode) {
+      alert("This group has no invite link yet. Reload the page and try again.");
+      return;
+    }
     const link = `${window.location.origin}/join/${group.inviteCode}`;
     navigator.clipboard.writeText(link).then(() => {
       setInviteCopied(true);
@@ -395,7 +428,15 @@ function GroupDetails() {
                 : "text-white/60 hover:text-white"
             }`}
           >
-            {tab.label}
+            <span className="relative inline-flex items-center">
+              {tab.label}
+              {tab.key === "chat" && unread > 0 && (
+                <span
+                  className="absolute -top-1 -right-2.5 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-black/40"
+                  aria-label={`${unread} unread message${unread === 1 ? "" : "s"}`}
+                />
+              )}
+            </span>
           </button>
         ))}
       </div>

@@ -1,5 +1,6 @@
 const Group = require("../models/Group");
 const Message = require("../models/Message");
+const ChatRead = require("../models/ChatRead");
 
 const MAX_TEXT = 2000;
 const PAGE_SIZE = 200;
@@ -74,4 +75,51 @@ const sendMessage = async (req, res) => {
   }
 };
 
-module.exports = { listMessages, sendMessage };
+
+/**
+ * How many messages this person has not seen.
+ *
+ * Own messages never count: sending something is not a reason to be told you
+ * have unread mail.
+ */
+const unreadCount = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { error } = await memberOrNull(groupId, req.user.id);
+    if (error) return res.status(error.status).json({ msg: error.msg });
+
+    const marker = await ChatRead.findOne({ user: req.user.id, group: groupId });
+
+    const filter = { group: groupId, sender: { $ne: req.user.id } };
+    // With no marker the whole conversation is unread, which is what someone
+    // joining an existing group should see.
+    if (marker) filter.createdAt = { $gt: marker.lastReadAt };
+
+    res.json({ count: await Message.countDocuments(filter) });
+  } catch (err) {
+    console.error("UNREAD COUNT ERROR:", err);
+    res.status(500).json({ msg: "Error counting messages" });
+  }
+};
+
+/** Mark everything up to now as read for this person. */
+const markRead = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { error } = await memberOrNull(groupId, req.user.id);
+    if (error) return res.status(error.status).json({ msg: error.msg });
+
+    await ChatRead.findOneAndUpdate(
+      { user: req.user.id, group: groupId },
+      { $set: { lastReadAt: new Date() } },
+      { upsert: true }
+    );
+
+    res.json({ msg: "Marked as read" });
+  } catch (err) {
+    console.error("MARK READ ERROR:", err);
+    res.status(500).json({ msg: "Error marking as read" });
+  }
+};
+
+module.exports = { listMessages, sendMessage, unreadCount, markRead };

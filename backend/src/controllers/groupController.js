@@ -4,6 +4,8 @@ const Expense = require("../models/Expense");
 const crypto = require("crypto");
 const { computeBalances, computeSettlements } = require("../utils/balances");
 
+const newInviteCode = () => crypto.randomBytes(4).toString("hex");
+
 // CREATE GROUP
 const createGroup = async (req, res) => {
   try {
@@ -13,7 +15,7 @@ const createGroup = async (req, res) => {
       return res.status(400).json({ msg: "Group name is required" });
     }
 
-    const inviteCode = crypto.randomBytes(4).toString("hex");
+    const inviteCode = newInviteCode();
 
     const group = new Group({
       name: name.trim(),
@@ -112,6 +114,14 @@ const getGroupDetails = async (req, res) => {
     // FIX: verify requesting user is actually a member
     if (!group.members.some((m) => m._id.toString() === req.user.id)) {
       return res.status(403).json({ msg: "Access denied" });
+    }
+
+    // Groups created before invite codes existed have none, and the client
+    // would build a link ending in "undefined". Issue one on first read rather
+    // than leaving those groups permanently un-shareable.
+    if (!group.inviteCode) {
+      group.inviteCode = newInviteCode();
+      await group.save();
     }
 
     const expenses = await Expense.find({ group: groupId })

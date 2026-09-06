@@ -44,6 +44,11 @@ function GroupChat({ groupId, currentUserId }) {
         if (active) {
           absorb(res.data.messages);
           setError("");
+          // Anything delivered while the tab is open has been seen. Only worth
+          // saying when something actually arrived.
+          if (res.data.messages?.length) {
+            API.post(`/messages/${groupId}/read`).catch(() => {});
+          }
         }
       } catch {
         // A dropped poll is not worth showing; the next one will catch up.

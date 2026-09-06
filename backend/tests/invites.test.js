@@ -101,3 +101,40 @@ describe("joining by invite", () => {
     await request(app).get(`/api/groups/join/${code}`).expect(401);
   });
 });
+
+describe("groups that predate invite codes", () => {
+  it("issues a code on first read instead of leaving the link undefined", async () => {
+    await Group.updateOne({ _id: groupId }, { $unset: { inviteCode: "" } });
+    expect((await Group.findById(groupId)).inviteCode).toBeUndefined();
+
+    const res = await request(app)
+      .get(`/api/groups/${groupId}`)
+      .set(authed(owner.token))
+      .expect(200);
+
+    expect(res.body.group.inviteCode).toMatch(/^[0-9a-f]{8}$/);
+    // Persisted, not just returned.
+    expect((await Group.findById(groupId)).inviteCode).toBe(res.body.group.inviteCode);
+  });
+
+  it("keeps the issued code stable across reads", async () => {
+    await Group.updateOne({ _id: groupId }, { $unset: { inviteCode: "" } });
+
+    const first = await request(app).get(`/api/groups/${groupId}`).set(authed(owner.token));
+    const second = await request(app).get(`/api/groups/${groupId}`).set(authed(owner.token));
+
+    expect(second.body.group.inviteCode).toBe(first.body.group.inviteCode);
+  });
+
+  it("makes the healed code usable as an invite", async () => {
+    await Group.updateOne({ _id: groupId }, { $unset: { inviteCode: "" } });
+
+    const read = await request(app).get(`/api/groups/${groupId}`).set(authed(owner.token));
+    const healed = read.body.group.inviteCode;
+
+    await request(app).get(`/api/groups/join/${healed}`).set(authed(friend.token)).expect(200);
+
+    const group = await Group.findById(groupId);
+    expect(group.members.map(String)).toContain(friend.id);
+  });
+});
